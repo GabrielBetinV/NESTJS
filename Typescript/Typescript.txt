@@ -1,0 +1,17 @@
+** Instalar vite para crear el proyecto
+
+yarn create vite => Tambien se puede hacer con npm
+nombre del proyecto
+vanilla
+typescript
+enter
+
+Abrir el proyecto en VS Code
+
+digitamos yarn para crear las dependencias =>  crea la carpeta de node_modules
+
+yarn dev => para levantar el proyecto
+
+accessible
+
+
