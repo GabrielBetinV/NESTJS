@@ -49,14 +49,14 @@ export const bulbasaur:PokemonInt = {
     age: 2
 }
 
-// export const charmander: Pokemon = {
-//     id: 4,
-//     name: 'Charmander',
-//     age: 1
-// }
+export const charmander: PokemonInt = {
+    id: 4,
+    name: 'Charmander',
+    age: 1
+}
 
-// export const pokemons: Pokemon[] = [];
+export const pokemons: PokemonInt[] = [];
 
-// pokemons.push( charmander, bulbasaur );
+pokemons.push( charmander, bulbasaur );
 
-// console.log(pokemons)
+console.log(pokemons)

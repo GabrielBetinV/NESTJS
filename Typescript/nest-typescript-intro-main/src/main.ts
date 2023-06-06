@@ -1,6 +1,6 @@
- import { pokemonIds , pokemon, bulbasaur} from './bases/02-objects';
+ //import { pokemonIds , pokemon, bulbasaur} from './bases/02-objects';
  //import { name, age,templateString } from './bases/01-types';
-// import { charmander } from './bases/03-classes';
+ import { charmander } from './bases/03-classes';
 // import { charmander } from './bases/04-injection';
 // import { charmander } from './bases/05-decorators';
 //import { charmander } from './bases/06-decorators2';
@@ -15,11 +15,9 @@ const app = document.querySelector<HTMLDivElement>('#app')!;
 /*02-OBJECTS */
  app.innerHTML = `
  
-   <h1> EL ARREGLO =>  ${pokemonIds}!</h1>
-   
-   <h1> OBJETO LITERAL=>  ${pokemon.id}  -  ${pokemon.name}!</h1>
+   <h1> LA CLASE =>  ${charmander.imageUrl}!</h1>
 
-   <h1> INTERFACE=>  ${bulbasaur.name}!</h1>
+ 
 
  `;
 
