@@ -13,13 +13,13 @@ const app = document.querySelector<HTMLDivElement>('#app')!;
 
 
 /*02-OBJECTS */
- app.innerHTML = `
+//  app.innerHTML = `
  
-   <h1> LA CLASE =>  ${charmander.imageUrl}!</h1>
+//    <h1> LA CLASE =>  ${charmander}!</h1>
 
  
 
- `;
+//  `;
 
 
 
@@ -32,7 +32,7 @@ const app = document.querySelector<HTMLDivElement>('#app')!;
 
 
 
-// app.innerHTML = `
-//   <h1>Hello ${ charmander.name } ${ charmander.id }!</h1>
-//   <a href="https://vitejs.dev/guide/features.html" target="_blank">Documentation</a>
-// `;
+app.innerHTML = `
+  <h1>Hello ${ charmander.name } ${ charmander.id }!</h1>
+  <a href="https://vitejs.dev/guide/features.html" target="_blank">Documentation</a>
+`;
