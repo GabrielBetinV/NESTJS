@@ -1,6 +1,8 @@
+// Decoracion Deprecated,  se utiliza para marcar una función, 
+//método, clase o propiedad como obsoleta o desaconsejada
 const Deprecated = (deprecationReason: string) => {
     return (target: any, memberName: string, propertyDescriptor: PropertyDescriptor) => {
-    //   console.log({target})
+       console.log({target})
       return {
 
         get() {
@@ -28,6 +30,10 @@ export class Pokemon {
         console.log(`${ this.name.toUpperCase() }!!`)
     }
 
+
+    // Se coloca un mensaje para que los desarrolladores
+    // Puedan ver que este metodo no se debe usar
+    // y deben uutilizar el siguiente metodo
     @Deprecated('Most use speak2 method instead')
     speak() {
         console.log(`${ this.name }, ${ this.name }!`)
