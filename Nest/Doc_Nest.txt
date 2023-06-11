@@ -1,0 +1,37 @@
+** Estructura del prouyect
+
+- .eslintrc.js =>  Configuraciones de Nest para buenas practicas
+
+- .gitignore =>  Lo que no se va a subir a Git
+
+- .prettierrc => Archivo de configuracion para seguir practicas o reglas  recomendadas en la codificacion
+
+- nest-cli.json => Configuracion del CLI de Nest
+
+- package.json => Datos del proyecto, Script, Dependencias, Dependencias de desarrollo
+
+- Readme => Archivo Markdown  con la informacion del proyecto, instalacione sy demas
+Si queremos ver el prewiev vamos a la paleta de comando y digitamos open prewiev
+
+- tsconfig.build.json => Extiende del tsconfig y contiente la informacion del proyecto para produccion
+
+- tsconfig.json  =>  Reglas y confirguraciones de Typescript
+
+- yarn.lock => Informa a Yarn como se construye el node modules
+
+- dist => Producto final, la carpeta que va para productivo
+
+- node_modules => Modulos y dependencias del proyecto
+
+- test => Carpeta para pruebas
+
+      * app.e2e-spec.ts => Pruebas para los endpoint de inicio a fin
+
+- src => Carpetas de recurso del proyecto,en donde vams a trabajar
+
+** Si queremos desactivar prettier
+
+yarn remove prettier
+
+
+** 
