@@ -5,10 +5,12 @@ import {
   Get,
   Param,
   ParseIntPipe,
+  ParseUUIDPipe,
   Patch,
   Post,
 } from '@nestjs/common';
 import { CarsService } from './cars.service';
+import { CreateCarDto } from './dto/create-car.dto';
 
 // Cuando busquemos en en  http://localhost:3000/cars se mostrara lo que tengamos dentro de la clase
 @Controller('cars')
@@ -58,12 +60,15 @@ export class CarsController {
 
   // Utilizando un Pipes para que convierta el id en entero => ParseiIntPipe
   // Ahora desde el fronentd o cliente, si manda un string va a recibir un error en 400
+
+  // Agregamos el Pipe ParseUUIDPipe que nos ayuda a validarlos UUID
+  // Hay varias versiones de UUID, se puede colcoar el ppipe indicando la version
   @Get(':id')
-  getCarByID(@Param('id', ParseIntPipe) id: Number) {
+  getCarByID(@Param('id', ParseUUIDPipe) id: string) {
     console.log({ id });
 
     // De esta manera obtendremos el carro de acuerdo a la posicion
-    return this.carsService.findOneById(+id);
+    return this.carsService.findOneById(id);
   }
 
   // Status del HTTP =>  https://developer.mozilla.org/en-US/docs/Web/HTTP/Status
@@ -98,29 +103,58 @@ export class CarsController {
 
   // TERMINAR EL CRUD DE CARS
 
-  // POST
-  @Post()
-  createCar(@Body() body: any) {
-    return body;
-  }
-  
+  // Cambiamos las formas de tener los ID con UUID
+  // Se debe cambiar el tipo de dato a string en
+  // todas las funciones que reciban y retornen ID
 
-  // PATCH
+  // POST
+
+  // Se debe crear un DTO => Data Transfer Object y no es más que 
+  //un objeto que se transfiere por la red entre dos sistemas
+  // Creamos el DTO para Cars ccreate-car.dto.ts
+
+  // Agregamos el DTO como tipo de dato para el Body
+  @Post()
+  createCar(@Body() createCarDto: CreateCarDto) {
+    return createCarDto;
+  }
+
+    // PATCH => No vamos a utiliza el ParseIntPipe porque el uuid es string
   @Patch(':id')
-  updateCar(@Param('id', ParseIntPipe) id: Number) {
+  updateCar(@Param('id' ) id:string) {
     console.log({ id });
 
     // De esta manera obtendremos el carro de acuerdo a la posicion
-    return this.carsService.findOneById(+id);
+    return this.carsService.findOneById(id);
   }
 
 
   // DELETE
   @Delete(':id')
-  deleteCar(@Param('id', ParseIntPipe) id: Number) {
+  deleteCar(@Param('id') id: string) {
     console.log({ id });
 
     // De esta manera obtendremos el carro de acuerdo a la posicion
-    return this.carsService.findOneById(+id);
+    return this.carsService.findOneById(id);
   }
+  
+
+  // // PATCH
+  // @Patch(':id')
+  // updateCar(@Param('id', ParseIntPipe) id: Number) {
+  //   console.log({ id });
+
+  //   // De esta manera obtendremos el carro de acuerdo a la posicion
+  //   return this.carsService.findOneById(+id);
+  // }
+
+
+  // // DELETE
+  // @Delete(':id')
+  // deleteCar(@Param('id', ParseIntPipe) id: Number) {
+  //   console.log({ id });
+
+  //   // De esta manera obtendremos el carro de acuerdo a la posicion
+  //   return this.carsService.findOneById(+id);
+  // }
 }

@@ -1,23 +1,33 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { Car } from './interfaces/car.interface';
+import { v4 as  uuid } from 'uuid';
+
 
 // Estos se puede inyectar
 @Injectable()
 export class CarsService {
   // Este objeto es el que vamos a enviar como respuesta del servicio
 
-  private cars = [
+
+  // Creamos la interface Car en la carpeta de interfaces=> car.interface.ts
+  // Los Id lo vamos a trabajar con UUID => https://www.npmjs.com/package/uuid
+  // Instalar uuid => yarn add uuid
+// instalar el paque para que nos ayude a utilizar uuid => yarn add -D @types/uuid
+// A cada id del objeto le colocremos la funcion importada
+
+  private cars: Car[] = [
     {
-      id: 1,
+      id: uuid(),
       brand: 'Toyota',
       model: 'Corolla',
     },
     {
-      id: 2,
+      id: uuid(),
       brand: 'Honda',
       model: 'Civic',
     },
     {
-      id: 3,
+      id: uuid(),
       brand: 'Jeep',
       model: 'Cherokee',
     },
@@ -58,7 +68,7 @@ export class CarsService {
 
 
     // Ejemplos de lanzar exeptions filters
-    findOneById(id: number) {
+    findOneById(id: string) {
 
       const car = this.cars.find((car) => car.id === id);
 
