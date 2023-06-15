@@ -1,6 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Car } from './interfaces/car.interface';
 import { v4 as  uuid } from 'uuid';
+import { CreateCarDto } from './dto/create-car.dto';
+import { UpdateCarDto } from './dto/update-car.dto';
 
 
 // Estos se puede inyectar
@@ -86,6 +88,54 @@ export class CarsService {
     }
   
 
+    // Servicio para crear los carros  con el operador spread .....
+    create(createCarDto: CreateCarDto){
+
+      const car:Car = {
+        id:uuid(),
+        ...createCarDto // operador spread
+      }
+
+      // agregamos el nuevo carro
+      this.cars.push(car);
+
+      return this.cars;
+
+    }
+
+    // Servicio para actualizar
+    update(id: string, updateCarDto:UpdateCarDto){
+
+    }
+
+
+
+    // // Servicio para crear los carros destructurando el servicio
+    // create({model,brand}: CreateCarDto){
+
+    //   const car:Car = {
+    //     id:uuid(),
+    //     brand: brand,
+    //     model: model
+    //   }
+
+    //   return this.cars;
+
+    // }
+
+
+    // // Servicio para crear los carros de forma normal
+    // create(createCarDto: CreateCarDto){
+
+    //   const car:Car = {
+    //     id:uuid(),
+    //     brand: createCarDto.brand,
+    //     model: createCarDto.model
+    //   }
+
+    //   return this.cars;
+
+    // }
 
 
   // Metodo para devolver un carro

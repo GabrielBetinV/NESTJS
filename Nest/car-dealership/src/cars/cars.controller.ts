@@ -8,12 +8,16 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  UsePipes,
+  ValidationPipe,
 } from '@nestjs/common';
 import { CarsService } from './cars.service';
-import { CreateCarDto } from './dto/create-car.dto';
+import { CreateCarDto , UpdateCarDto} from './dto'; // Importamos los DTO desde el index de dto
+
 
 // Cuando busquemos en en  http://localhost:3000/cars se mostrara lo que tengamos dentro de la clase
-@Controller('cars')
+@Controller('cars') 
+//@UsePipes( ValidationPipe) // => Pipe a nivel global de controlador, es mejor colocarlo a nivel global de aplicacion en el main
 export class CarsController {
   // Aca colocaremos lo que queremos mostrar, es decir las peticiones
 
@@ -114,18 +118,37 @@ export class CarsController {
   // Creamos el DTO para Cars ccreate-car.dto.ts
 
   // Agregamos el DTO como tipo de dato para el Body
+  // Ahora que tenemos el DTO podriamos agregar el validatePipe
+  // HAy 4 lugares en donde se pueden colocar ppies (Anivel de parametros@params,
+  // A nivel del controlador o un metodo del controlador,  a nivel global de aplicacion
+  // o a nivel global de controlador)
+
+  // Con UsePipes le decimos al post que utilice el validationPIpe pero necesitamos instalar
+  // class-validator u class-transformer
+  // yarn add class-validator class-transformer
+
+  // Importar el class-validator en el DTO y colocar el tipo de validacion
+
+
   @Post()
+  //@UsePipes( ValidationPipe) ?=> Es mejor colocarlo  a nivel de controlador ver arriba
   createCar(@Body() createCarDto: CreateCarDto) {
-    return createCarDto;
+
+    // Vamos a crear el carro, enviamos el objeto al servicio para crear el nuevo carro
+    return this.carsService.create(createCarDto);
   }
 
-    // PATCH => No vamos a utiliza el ParseIntPipe porque el uuid es string
+    // PATCH => No vamos a utiliza el ParseIntPipe porque el uuid es string.
+    // utilizaremos el  ParseUUIDPipe
+    // Creamos un DTO para actualizar UpdateCarDto
   @Patch(':id')
-  updateCar(@Param('id' ) id:string) {
-    console.log({ id });
+  updateCar(@Param('id',ParseUUIDPipe ) id:string,
+  @Body() updateCarDto: UpdateCarDto ) {
+      
+      return updateCarDto;
 
-    // De esta manera obtendremos el carro de acuerdo a la posicion
-    return this.carsService.findOneById(id);
+    // // De esta manera obtendremos el carro de acuerdo a la posicion
+    // return this.carsService.findOneById(id);
   }
 
 
