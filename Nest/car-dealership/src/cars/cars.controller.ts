@@ -145,7 +145,12 @@ export class CarsController {
   updateCar(@Param('id',ParseUUIDPipe ) id:string,
   @Body() updateCarDto: UpdateCarDto ) {
       
-      return updateCarDto;
+
+    // Llamamos al servicio que actualiza el cars
+    return this.carsService.update(id,updateCarDto);
+
+
+    //  return updateCarDto;
 
     // // De esta manera obtendremos el carro de acuerdo a la posicion
     // return this.carsService.findOneById(id);
@@ -154,11 +159,11 @@ export class CarsController {
 
   // DELETE
   @Delete(':id')
-  deleteCar(@Param('id') id: string) {
+  deleteCar(@Param('id',ParseUUIDPipe) id: string) {
     console.log({ id });
 
     // De esta manera obtendremos el carro de acuerdo a la posicion
-    return this.carsService.findOneById(id);
+    return this.carsService.delete(id);
   }
   
 

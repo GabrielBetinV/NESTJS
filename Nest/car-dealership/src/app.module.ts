@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 // import { AppController } from './app.controller';
 // import { AppService } from './app.service';
 import { CarsModule } from './cars/cars.module';
+import { BrandsModule } from './brands/brands.module';
 
 // Los modulos Agrupan y desacoplan un conjunto de funcionalidad
 // específica por dominio.
@@ -15,7 +16,7 @@ import { CarsModule } from './cars/cars.module';
 // nest g mo cars, esto actualizara la importacion del modulo en el  app Module
 
 @Module({
-  imports: [CarsModule],
+  imports: [CarsModule, BrandsModule],
   controllers: [],
   providers: [],
   exports: [],

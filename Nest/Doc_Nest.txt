@@ -34,4 +34,11 @@ Si queremos ver el prewiev vamos a la paleta de comando y digitamos open prewiev
 yarn remove prettier
 
 
-** 
+**  Comandos CLI
+
+Nest CLI Resource - Brands
+
+- Este comando creara todo lo que necesitamos para nuestros servicios
+nest g resource brands --no-spec 
+
+Nos preguntara si queremos hacer rest api, websocket, micro servicios etc
