@@ -42,3 +42,216 @@ Nest CLI Resource - Brands
 nest g resource brands --no-spec 
 
 Nos preguntara si queremos hacer rest api, websocket, micro servicios etc
+
+Esto crea todo para hacer el CRUD
+
+
+- Crear un a semlla =>  SEED
+
+ son útiles en el desarrollo de aplicaciones para crear un conjunto de datos de muestra que
+ se pueda utilizar durante las pruebas o para generar contenido inicial en una base de datos recién creada.
+
+Comentar los objetos inicializados en cars y brands
+
+
+Creamos un nuevo recurso llamado seed
+
+nest g res seed --no-spec
+
+Borramos lo que no utilizaremos
+Dto
+Entities
+
+En el controlador solo dejaremos un GET y lo renombramos
+
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+} from '@nestjs/common';
+import { SeedService } from './seed.service';
+
+@Controller('seed')
+export class SeedController {
+  constructor(private readonly seedService: SeedService) {}
+
+  @Get()
+  runSeed() {
+    return this.seedService.findAll();
+  }
+}
+
+
+Creamos un servicio que tendra una data ficticia
+
+import { Injectable } from '@nestjs/common';
+
+
+@Injectable()
+export class SeedService {
+ 
+  //Metodo que retornara o hara las veces de los datos almacenados en la base de datoss
+  populateDB(){
+
+    return 'SEED Execute';
+
+  }
+
+
+
+}
+
+
+Modificamos el controlador para que utilice el servicio
+
+  @Get()
+  runSeed() {
+    return this.seedService.populateDB();
+  }
+
+
+
+Creamos uan carpeta data y esotos archivos para simular los datos de la DB
+
+cars.seed.ts
+
+import { v4 as uuid } from 'uuid';
+import { Car } from '../../../dist/cars/interfaces/car.interface';
+
+
+// Esta constante tendra las datas de los carros
+export const CARS_SEED: Car[] = [
+  {
+    id: uuid(),
+    brand: 'Toyota',
+    model: 'Corolla',
+  },
+  {
+    id: uuid(),
+    brand: 'Honda',
+    model: 'Civic',
+  },
+  {
+    id: uuid(),
+    brand: 'Jeep',
+    model: 'Cherokee',
+  },
+];
+
+
+
+brands.seed.ts
+
+import { v4 as uuid } from 'uuid';
+import { Brand } from 'src/brands/entities/brand.entity';
+
+
+// Esta constante tendra las datas de las marcas
+export const BRAND_SEED: Brand[] = [
+  {
+    id: uuid(),
+    name: 'Toyota',
+    createdAt: new Date().getTime(),
+  },
+  {
+    id: uuid(),
+    name: 'Honda',
+    createdAt: new Date().getTime(),
+  },
+  {
+    id: uuid(),
+    name: 'Jeep',
+    createdAt: new Date().getTime(),
+  },
+];
+
+
+
+En el servicio llamamos las datas para retornarlas
+
+
+ //Metodo que retornara o hara las veces de los datos almacenados en la base de datoss
+  populateDB() {
+   
+
+    // Asi pódemos llamar cada SEED y Retornarlos de  forma independiente
+     //return BRAND_SEED;
+
+     //return CARS_SEED;
+
+
+      return 'SEED Execute';
+  }
+
+Creamos metodos para cargar los dartos del seed en cada servicio cars y brands
+
+  // Este metodo recibe el arreglo y lo convierte en el cars
+  // Del servicio para obtener todos los metodos del servicio
+  fillCarsWithSeedData(cars: Car[]) {
+    this.cars = cars;
+  }
+}
+
+
+ // Este metodo recibe el arreglo y lo convierte en el brands
+  // Del servicio para obtener todos los metodos del servicio
+  fillCarsWithSeedData(brands: Brand[]) {
+    this.brands = brands;
+  }
+
+
+Inyectamos el servicio de cars en el seed service
+
+Exportamos los servicios en  cars y brands
+
+
+
+@Module({
+  controllers: [CarsController],
+  providers: [CarsService],
+  exports: [CarsService]
+})
+
+@Module({
+  controllers: [BrandsController],
+  providers: [BrandsService],
+  exports: [BrandsService]
+})
+
+Importamos los modulos de cars y brands en el modulo de speed
+
+import { Module } from '@nestjs/common';
+import { SeedService } from './seed.service';
+import { SeedController } from './seed.controller';
+import { CarsService } from 'src/cars/cars.service';
+import { BrandsService } from 'src/brands/brands.service';
+import { CarsModule } from 'src/cars/cars.module';
+import { BrandsModule } from 'src/brands/brands.module';
+
+@Module({
+  controllers: [SeedController],
+  providers: [SeedService],
+  imports: [CarsModule,BrandsModule]
+})
+export class SeedModule {}
+
+
+En postman ejecutamos primero el seed
+
+http://localhost:3000/seed
+
+y luego el de cars y brands para ver la data cargada
+
+
+** Build  de produccion basico
+
+yarn build
+yarn start:prod
+
+
+
+

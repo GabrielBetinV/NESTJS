@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Car } from './interfaces/car.interface';
 import { v4 as uuid } from 'uuid';
 import { CreateCarDto } from './dto/create-car.dto';
@@ -16,21 +20,21 @@ export class CarsService {
   // A cada id del objeto le colocremos la funcion importada
 
   private cars: Car[] = [
-    {
-      id: uuid(),
-      brand: 'Toyota',
-      model: 'Corolla',
-    },
-    {
-      id: uuid(),
-      brand: 'Honda',
-      model: 'Civic',
-    },
-    {
-      id: uuid(),
-      brand: 'Jeep',
-      model: 'Cherokee',
-    },
+    // {
+    //   id: uuid(),
+    //   brand: 'Toyota',
+    //   model: 'Corolla',
+    // },
+    // {
+    //   id: uuid(),
+    //   brand: 'Honda',
+    //   model: 'Civic',
+    // },
+    // {
+    //   id: uuid(),
+    //   brand: 'Jeep',
+    //   model: 'Cherokee',
+    // },
   ];
 
   // Metodos para devolver los carros
@@ -98,43 +102,36 @@ export class CarsService {
     //Utiliza la funcion que encuentra el carro con el id
     let carDB = this.findOneById(id);
 
-     // Validamos si el ID que envian en el body ees igual al del objeto para
-     // la exception
-     if(updateCarDto.id && updateCarDto.id !== id)
+    // Validamos si el ID que envian en el body ees igual al del objeto para
+    // la exception
+    if (updateCarDto.id && updateCarDto.id !== id)
       throw new BadRequestException(`Car id is not valid inside body`);
 
     this.cars = this.cars.map((car) => {
-
       // Validamos si el id que recibimos se encuentra en el arreglo
       if (car.id === id) {
-
-       // sintaxis de desestructuración (...). Esto sobrescribe el objeto
+        // sintaxis de desestructuración (...). Esto sobrescribe el objeto
         carDB = {
           ...carDB, // Sobre escribir el obtjeto que encontre - Este objeto se actualiza con el recibido
           ...updateCarDto, // Este es elobjeto que recibo en el body - Este es el dato que sobre escribira carDB
           id, // Este es el id que recibo en el parametro - Sobreescribira el id del objeto original
         };
-        return carDB;// Retorno el objeto actualizado
-
+        return carDB; // Retorno el objeto actualizado
       }
 
-       return car; 
-
-
+      return car;
     });
 
     return carDB; // Retorno nuevo objeto actualizado  o no
   }
 
   //servicio para eliminar un carro
-  delete( id:string){
-
+  delete(id: string) {
     //Reutilizamos la funcion que busca el carro con el id
     const car = this.findOneById(id);
 
     // lo eliminamos de la lista
-    this.cars = this.cars.filter( car => car.id !== id);
-
+    this.cars = this.cars.filter((car) => car.id !== id);
   }
 
   // // Servicio para crear los carros destructurando el servicio
@@ -177,4 +174,11 @@ export class CarsService {
 
   //   return car;
   // }
+
+
+  // Este metodo recibe el arreglo y lo convierte en el cars
+  // Del servicio para obtener todos los metodos del servicio
+  fillCarsWithSeedData(cars: Car[]) {
+    this.cars = cars;
+  }
 }
