@@ -47,3 +47,51 @@ yarn add @nestjs/serve-static
  ServeStaticModule.forRoot({
       rootPath: join(__dirname,'..','public'),
       }) 
+
+** Descargar DockerCompose
+
+- Instalar Docker Desktop
+
+https://docs.docker.com/desktop/install/windows-install/https://docs.docker.com/desktop/install/windows-install/
+
+- Actualizar el kernel
+
+wsl --update
+
+- Crear un archivo en el root de la aplicacion
+
+docker-compose.yaml
+
+
+version: '3'
+
+services:
+  db:
+    image: mongo:5
+    restart: always
+    ports: 
+     - 27017:27017
+    environment:
+      MONGODB_DATABASE: nest-pokemon 
+    volumes:
+      - ./mongo:/data/db  
+
+
+- Correr este comando para crear la imagen
+
+docker-compose up -d
+
+esto crea una carpeta mongo con los archivos que necesita para la creacion
+
+- Abrir el docker desktop observaremos elñ contendeor llamado  pokedex y  la base de dato creada 
+
+
+-- Instalar table plus para conectarnos a la base de datos
+
+-- Conectarnos con la base de datos
+
+mongodb://localhost:27017/nest-pokemon
+
+
+Siempre se debe levantar el servicio de la base de datos
+
