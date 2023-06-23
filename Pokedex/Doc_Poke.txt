@@ -95,3 +95,209 @@ mongodb://localhost:27017/nest-pokemon
 
 Siempre se debe levantar el servicio de la base de datos
 
+** Conectar nest con Mongo
+
+https://docs.nestjs.com/techniques/mongodb
+
+yarn add @nestjs/mongoose mongoose
+
+Importar Moongose en  el app module
+
+import { Module } from '@nestjs/common';
+import { ServeStaticModule } from '@nestjs/serve-static';
+import { join } from 'path';
+import { PokemonModule } from './pokemon/pokemon.module';
+import { MongooseModule } from '@nestjs/mongoose';
+
+@Module({
+  imports: [
+
+    ServeStaticModule.forRoot({
+      rootPath: join(__dirname,'..','public'),
+      }),
+
+      MongooseModule.forRoot('mongodb://localhost:27701/nest-pokemon'),
+    PokemonModule
+  ],
+})
+export class AppModule {}
+
+
+** Creando esquemas  y modelos
+
+- Crear la entidad - entities dentro de pokemon
+
+import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
+import { Document } from "mongoose";
+
+// Extiende de Document de monggose
+// Se debe colocar el decorador de squema de mongo
+@Schema()
+export class Pokemon  extends Document{
+
+    // El ID no se especifica porque
+    // Mongo lo da
+    @Prop({
+        unique:true,
+        index: true
+
+    })	
+    name:string;
+
+    @Prop({
+        unique:true,
+        index: true
+
+    })
+    no: number;
+}
+export const PokemonSchema = SchemaFactory.createForClass( Pokemon);
+
+- Realizar la importacion dentro del modulo de pokemon
+
+import { Module } from '@nestjs/common';
+import { PokemonService } from './pokemon.service';
+import { PokemonController } from './pokemon.controller';
+import { Pokemon, PokemonSchema } from './entities/pokemon.entity';
+import { MongooseModule } from '@nestjs/mongoose';
+
+@Module({
+  controllers: [PokemonController],
+  providers: [PokemonService],
+  imports: [
+    MongooseModule.forFeature([
+      {
+        name: Pokemon.name,
+        schema: PokemonSchema
+      }
+    ])
+  ]
+})
+export class PokemonModule {}
+
+
+** Recibir y validar la data
+
+- Instalar class validetor y transformer
+
+yarn add class-validator class-transformer
+
+- Agregamos la validacion global
+
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from './app.module';
+import { ValidationPipe } from '@nestjs/common';
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+
+
+  // De esta manera podemos colocar un prefijo para las api
+  // Se consumiria asi http://localhost:3000/api/v2/pokemon
+  app.setGlobalPrefix('api/v2');
+
+
+  // Para trabajar con los pipes de class validatir
+  app.useGlobalPipes(
+    new ValidationPipe({
+    whitelist: true,
+    forbidNonWhitelisted: true,
+    })
+    );
+
+
+  await app.listen(3000);
+}
+bootstrap();
+
+
+
+- Agregamos la validacion en el DTO de crear, porque actualizar extiende de el
+import { IsInt, IsPositive, IsString, Min, MinLength } from "class-validator";
+
+export class CreatePokemonDto {
+
+    @IsInt()
+    @IsPositive()
+    @Min(1)
+    no:number;
+
+
+    @IsString()
+    @MinLength(1)
+    name: string;
+
+}
+
+
+Al realizar el consumo en postman observaremos que las validaciones si estan funcionando
+
+
+-  podemos returnar el objeto para verlo
+
+  create(createPokemonDto: CreatePokemonDto) {
+    return  createPokemonDto ;
+  }
+
+
+**  Como crear el pokemon en la base de datos
+
+- Imyectamos el modelo en el servicio de pokemon
+
+import { Injectable } from '@nestjs/common';
+import { CreatePokemonDto } from './dto/create-pokemon.dto';
+import { UpdatePokemonDto } from './dto/update-pokemon.dto';
+import { Pokemon } from './entities/pokemon.entity';
+import { Model } from 'mongoose';
+import { InjectModel } from '@nestjs/mongoose';
+
+@Injectable()
+export class PokemonService {
+
+  // Inyectar en el contructor el provider de mongoose para crear el modelo
+  constructor(
+    @InjectModel(Pokemon.name)
+    private readonly pokemonModel: Model<Pokemon>
+  ){}
+
+  create(createPokemonDto: CreatePokemonDto) {
+
+    createPokemonDto.name = createPokemonDto.name.toLocaleLowerCase();
+
+    return  createPokemonDto ;
+  }
+
+  findAll() {
+    return `This action returns all pokemon`;
+  }
+
+  findOne(id: number) {
+    return `This action returns a #${id} pokemon`;
+  }
+
+  update(id: number, updatePokemonDto: UpdatePokemonDto) {
+    return `This action updates a #${id} pokemon`;
+  }
+
+  remove(id: number) {
+    return `This action removes a #${id} pokemon`;
+  }
+}
+
+
+-  Utilizamos el metodo post del servicio de pokemon para realizar la insercion en la base de datos
+
+
+  async create(createPokemonDto: CreatePokemonDto) {
+
+    createPokemonDto.name = createPokemonDto.name.toLocaleLowerCase();
+
+    const pokemon = await this.pokemonModel.create(createPokemonDto);
+
+    return  pokemon ;
+  }
+
+- Podemos ver el registro en la base de datos
+
+
+
