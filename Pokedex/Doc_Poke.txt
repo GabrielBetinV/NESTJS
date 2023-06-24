@@ -300,4 +300,172 @@ export class PokemonService {
 - Podemos ver el registro en la base de datos
 
 
+** Codigo de errores
+
+https://developer.mozilla.org/en-US/docs/Web/HTTP/Status
+
+Agregar un try catch al metodo de crear en el servicio y utilizar BadRequestException
+
+ async create(createPokemonDto: CreatePokemonDto) {
+
+    createPokemonDto.name = createPokemonDto.name.toLocaleLowerCase();
+       
+        try {
+          
+          const pokemon = await this.pokemonModel.create(createPokemonDto);
+
+          return  pokemon ;
+        } catch (error) {
+    
+          //console.log(error);
+          if (error.code === 11000) {
+
+            // Lanzamos un error que indica cual valor o campos estan duplicado
+            throw new BadRequestException(
+              `Pokemon exists in db ${JSON.stringify(error.keyValue)}`,
+            );
+          } else {
+            throw new InternalServerErrorException(
+              `Cant't create Pokemon - Check server logs`,
+            );
+          } 
+        }  
+  }
+
+
+** Indicar el codigo que queremos con el decorador de HttpCode en el controlador
+
+  @Post()
+  @HttpCode(HttpStatus.OK)
+  create(@Body() createPokemonDto: CreatePokemonDto) {
+    return this.pokemonService.create(createPokemonDto);
+  }
+
+Con esta opcion, dandole click en al HttpStatus podramos ver la traduccion de los codigos
+
+
+** FindOneBy => Consultar un pokemon especifico
+
+Controlador
+
+  @Get(':term')
+  findOne(@Param('term') term: string) {
+    return this.pokemonService.findOne(term);
+  }
+
+
+Servicio
+ async findOne(term: string) {
+    let pokemon: Pokemon;
+
+    // Busqueda pornumero => Validar si es un numero y realizar la busqueda
+    if (!isNaN(+term)) {
+      pokemon = await this.pokemonModel.findOne({ no: term });
+    }
+
+    // Buscar por el MongoID si no encontro en la busqueda anterior
+    if( !pokemon && isValidObjectId(term)){
+      pokemon = await this.pokemonModel.findById(term);
+    }
+
+    // Si no se ha encontrado con las opciones anterior, buscamos por el nombre
+    if(!pokemon){
+      pokemon = await this.pokemonModel.findOne({ name: term.toLocaleLowerCase().trim() });
+    }
+
+
+    // Lanzamos una exception si el pokemon no se encuentra
+    if (!pokemon)
+      throw new NotFoundException(
+        `Pokemon with id, name or no "${term}" nto found`,
+      );
+
+    return pokemon;
+  }
+
+** Actualizar
+
+cONTROLADOR
+
+  @Patch(':term')
+  update(@Param('term') term: string, @Body() updatePokemonDto: UpdatePokemonDto) {
+    return this.pokemonService.update(term, updatePokemonDto);
+  }
+
+Servicio
+
+  async update(term: string, updatePokemonDto: UpdatePokemonDto) {
+    // Buscamos si existe el pokemon reutilizando el metodo de busqueda anterior
+    const pokemon = await this.findOne(term);
+
+    // Si con la busqueda anterior encuentra el pokemon pasara a este metodo
+
+    // Pasamos el nombre en minuscula
+    if (updatePokemonDto.name) {
+      updatePokemonDto.name = updatePokemonDto.name.toLocaleLowerCase();
+    }
+
+    try {
+      //grabar en base de datos
+      await pokemon.updateOne(updatePokemonDto, { new: true });
+
+      // Sobre escribo el pokemon con el objeto que recibimos en el body, ya que seguramente paso
+      // Todas las validaciones anterior
+      return { ...pokemon.toJSON(), ...updatePokemonDto };
+    } catch (error) {
+      if (error.code === 11000) {
+        // Lanzamos un error que indica cual valor o campos estan duplicado
+        throw new BadRequestException(
+          `Pokemon exists in db ${JSON.stringify(error.keyValue)}`,
+        );
+      } else {
+        throw new InternalServerErrorException(
+          `Cant't create Pokemon - Check server logs`,
+        );
+      }
+    }
+  }
+
+
+** Crear un metodo para manejo de errores
+
+ private handleException(error: any) {
+    if (error.code === 11000) {
+      // Lanzamos un error que indica cual valor o campos estan duplicado
+      throw new BadRequestException(
+        `Pokemon exists in db ${JSON.stringify(error.keyValue)}`,
+      );
+    } else {
+      throw new InternalServerErrorException(
+        `Cant't create Pokemon - Check server logs`,
+      );
+    }
+  }
+
+** Agregamos la invocacion del metodo en donde queremos utilizarlo
+
+ async create(createPokemonDto: CreatePokemonDto) {
+    createPokemonDto.name = createPokemonDto.name.toLocaleLowerCase();
+
+    try {
+      const pokemon = await this.pokemonModel.create(createPokemonDto);
+
+      return pokemon;
+    } catch (error) {
+      this.handleException(error);
+    }
+  }
+
+** Delete
+
+Controlador
+
+  @Delete(':id')
+  remove(@Param('id') id: string) {
+    return this.pokemonService.remove(id);
+  }
+
+Servicio
+
+
 
