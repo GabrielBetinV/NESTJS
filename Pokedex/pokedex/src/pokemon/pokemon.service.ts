@@ -86,18 +86,55 @@ export class PokemonService {
     }
   }
 
+
+
+// Metodo de eliminar uytilizando los pipes
+
   async remove(id: string) {
     
-      const pokemon = this.findOne(id);
-      (await pokemon).deleteOne();
+     //const pokemon = this.findOne(id);
+    // (await pokemon).deleteOne();
 
 
-      // Se podria hacer todo en una linea
-      //this.pokemonModel.findByIdAndRemove(id);
+    // Se podria hacer todo en una linea
+    //this.pokemonModel.findByIdAndRemove(id);
+
+    //const result = await this.pokemonModel.findByIdAndDelete(id);
+  
+    // De esta manera con una sola linea consultamos el id y lo eliminamos
+    // si no lo encuentra se muestra el contador en 0 para que el fronted lo visualice  
+   // const result = await this.pokemonModel.deleteOne({_id: id});
+
+   
+   // De esta manera destructuracmos el deleteOne y podemos enviar una exception
+   // Si el id no se encuentra
+   const {deletedCount} = await this.pokemonModel.deleteOne({_id: id});
+
+   if(deletedCount === 0){
+    throw new BadRequestException(`Pokemon with id "${id}" not found`);
+
+   }
+
+
+
+  return;
+}
+
+
+
+
+  // async remove(id: string) {
+    
+  //     //const pokemon = this.findOne(id);
+  //     //(await pokemon).deleteOne();
+
+
+  //     // Se podria hacer todo en una linea
+  //     //this.pokemonModel.findByIdAndRemove(id);
 
     
-    return `This action removes a #${id} pokemon`;
-  }
+  //   return id;
+  // }
 
   private handleException(error: any) {
     if (error.code === 11000) {
