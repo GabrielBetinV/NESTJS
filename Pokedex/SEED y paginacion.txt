@@ -176,6 +176,209 @@ export class SeedService {
 
 ** Insertar Pokemon en lote
 
+- Exportar el modulo de Mongoose que tiene el esquema
+
+import { Module } from '@nestjs/common';
+import { PokemonService } from './pokemon.service';
+import { PokemonController } from './pokemon.controller';
+import { Pokemon, PokemonSchema } from './entities/pokemon.entity';
+import { MongooseModule } from '@nestjs/mongoose';
+
+@Module({
+  controllers: [PokemonController],
+  providers: [PokemonService],
+  imports: [
+    MongooseModule.forFeature([
+      {
+        name: Pokemon.name,
+        schema: PokemonSchema
+      }
+    ])
+  ],
+  exports: [
+    MongooseModule
+  ]
+})
+export class PokemonModule {}
+
+- Importamos el PokemonModuile en el modulo del seed
+
+import { Module } from '@nestjs/common';
+import { SeedService } from './seed.service';
+import { SeedController } from './seed.controller';
+import { PokemonModule } from 'src/pokemon/pokemon.module';
+
+@Module({
+  controllers: [SeedController],
+  providers: [SeedService],
+  imports:[
+    PokemonModule
+  ]
+})
+export class SeedModule {}
+
+
+- Inyectar el MOdel en el servicio del seed y completar la funcion que insertara los datos
+
+import { Injectable } from '@nestjs/common';
+import axios, {AxiosInstance} from 'axios';
+import { PokeResponse } from './interfaces/poke-response.interface';
+import { InjectModel } from '@nestjs/mongoose';
+import { Pokemon } from 'src/pokemon/entities/pokemon.entity';
+import { Model } from 'mongoose';
+
+
+@Injectable()
+export class SeedService {
+
+  private readonly axios: AxiosInstance =  axios;
+
+  constructor(
+    @InjectModel(Pokemon.name)
+    private readonly pokemonModel: Model<Pokemon>,
+  ) {}
+
+  async executeSeed(){
+    const {data } =  await this.axios.get<PokeResponse>('https://pokeapi.co/api/v2/pokemon?limit=10'); 
+    
+    //Recorremos la data para obtener  el nombre y la url
+    data.results.forEach(async({name, url}) => {
+
+      // Realizamos un split a la URL y obtendremos la posicion en donde se encuentra el no del Pokemon
+      const segments = url.split('/');
+      console.log(segments)
+      const no:number = + segments[segments.length -2];
+
+
+     const pokemon = await this.pokemonModel.create({name,no})
+
+    });
+
+    return data.results
+  }
+
+}
+
+
+** Insertar Multiples datos
+
+Hay dos formas
+
+1. Creando un arreglo de promesas para almacenarlas y luego ejecutarla
+
+import { Injectable } from '@nestjs/common';
+import axios, { AxiosInstance } from 'axios';
+import { PokeResponse } from './interfaces/poke-response.interface';
+import { InjectModel } from '@nestjs/mongoose';
+import { Pokemon } from 'src/pokemon/entities/pokemon.entity';
+import { Model } from 'mongoose';
+
+@Injectable()
+export class SeedService {
+  private readonly axios: AxiosInstance = axios;
+
+  constructor(
+    @InjectModel(Pokemon.name)
+    private readonly pokemonModel: Model<Pokemon>,
+  ) {}
+
+  async executeSeed() {
+
+    // Eliminamos todos los datos de la BD pára que no guarde registros duplicados
+    await this.pokemonModel.deleteMany({});
+
+
+    const { data } = await this.axios.get<PokeResponse>(
+      'https://pokeapi.co/api/v2/pokemon?limit=10',
+    );
+
+    // Array que tendra almacenada las promesas
+    const insertPromisesArrayt = [];
+
+    //Recorremos la data para obtener  el nombre y la url
+    data.results.forEach(async ({ name, url }) => {
+      // Realizamos un split a la URL y obtendremos la posicion en donde se encuentra el no del Pokemon
+      const segments = url.split('/');
+      console.log(segments);
+      const no: number = +segments[segments.length - 2];
+
+      //const pokemon = await this.pokemonModel.create({name,no})
+
+
+      // Almacenamos las promesas en el array
+      insertPromisesArrayt.push();
+      this.pokemonModel.create({ name, no });
+    });
+
+    // Ejecutamos la promesa para que se creen los datos
+    const newArray = await Promise.all(insertPromisesArrayt);
+
+    return {...newArray};
+  }
+}
+
+
+
+2. Se sigue la metodologia pero se almacena y se inserta de forma diferente
+
+import { Injectable } from '@nestjs/common';
+import axios, { AxiosInstance } from 'axios';
+import { PokeResponse } from './interfaces/poke-response.interface';
+import { InjectModel } from '@nestjs/mongoose';
+import { Pokemon } from 'src/pokemon/entities/pokemon.entity';
+import { Model } from 'mongoose';
+
+@Injectable()
+export class SeedService {
+  private readonly axios: AxiosInstance = axios;
+
+  constructor(
+    @InjectModel(Pokemon.name)
+    private readonly pokemonModel: Model<Pokemon>,
+  ) {}
+
+  async executeSeed() {
+
+    // Eliminamos todos los datos de la BD pára que no guarde registros duplicados
+    await this.pokemonModel.deleteMany({});
+
+
+    const { data } = await this.axios.get<PokeResponse>(
+      'https://pokeapi.co/api/v2/pokemon?limit=1000',
+    );
+
+    // Array que tendra almacenada las promesas
+    const pokemonToInsert: {name:string, no:number}[] = [];
+
+    //Recorremos la data para obtener  el nombre y la url
+    data.results.forEach(async ({ name, url }) => {
+      // Realizamos un split a la URL y obtendremos la posicion en donde se encuentra el no del Pokemon
+      const segments = url.split('/');
+      console.log(segments);
+      const no: number = +segments[segments.length - 2];
+
+      //const pokemon = await this.pokemonModel.create({name,no})
+
+
+      // Almacenamos las promesas en el array
+      pokemonToInsert.push({ name, no });
+    });
+
+    // Ejecutamos la promesa para que se creen los datos
+    const newArray = await this.pokemonModel.insertMany(pokemonToInsert);
+
+    return {...newArray};
+  }
+}
+
+
+Al ejecutar el seed, se insertaran los 100 registros
+
+
+
+
+
+
 
 
 

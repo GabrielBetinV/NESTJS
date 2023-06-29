@@ -93,7 +93,9 @@ npm i -g @nestjs/cli
 ```
 docker-compose up -d
 ```
+5. Ejecutar el seed
 
+http://localhost:3000/api/v2/seed
 
 ## Stack usado
 * MongoDB
