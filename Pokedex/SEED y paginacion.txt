@@ -375,10 +375,242 @@ export class SeedService {
 Al ejecutar el seed, se insertaran los 100 registros
 
 
+** Crear un custom provider para utilizar axios  u oros paquetes
+
+- Crear una carpeta dentro de common que se llame interface
+
+- Creamos la siguiente interface http-adapter.interface.ts
+
+export interface HttpAdapter {
+
+    get<T>(url: string): Promise<T>;
+
+}
+
+- Creamos una carpeta de common que se llame adapter
+
+- Creamos el provider que recibira la url
+
+import axios,{AxiosInstance} from "axios";
+import { HttpAdapter } from "../interfaces/http-adapter.interface";
+import { Injectable } from "@nestjs/common";
+
+@Injectable()
+export class AxiosAdapter implements HttpAdapter{
+
+    
+    private  axios: AxiosInstance = axios;
+
+   async get<T>(url: string): Promise<T> {
+        
+        try {
+
+            const {data} = await this.axios.get<T>(url);
+            return data;
+            
+        } catch (error) {
+            throw new Error('This is an error - Check logs');
+            
+        }
 
 
+    }
 
 
+}
+
+- Exportamos el provider en el modulo de common
+
+import { Module } from '@nestjs/common';
+import { AxiosAdapter } from './adapters/axios.adapter';
+
+@Module({
+    providers:[AxiosAdapter],
+    exports:[AxiosAdapter]
+})
+export class CommonModule {}
 
 
+- IMportamos el modulo common dentro del seedmodule
 
+import { Module } from '@nestjs/common';
+import { SeedService } from './seed.service';
+import { SeedController } from './seed.controller';
+import { PokemonModule } from 'src/pokemon/pokemon.module';
+import { CommonModule } from 'src/common/common.module';
+
+@Module({
+  controllers: [SeedController],
+  providers: [SeedService],
+  imports:[
+    PokemonModule,
+    CommonModule
+  ]
+})
+export class SeedModule {}
+
+- Utilizart el axios adapter en el servicio seed, inyectandolo
+
+cambiamos lo de axios por el adaptador
+
+
+import { Injectable } from '@nestjs/common';
+import { PokeResponse } from './interfaces/poke-response.interface';
+import { InjectModel } from '@nestjs/mongoose';
+import { Pokemon } from 'src/pokemon/entities/pokemon.entity';
+import { Model } from 'mongoose';
+import { AxiosAdapter } from 'src/common/adapters/axios.adapter';
+
+@Injectable()
+export class SeedService {
+ 
+
+  constructor(
+    @InjectModel(Pokemon.name)
+    private readonly pokemonModel: Model<Pokemon>,
+    private readonly http: AxiosAdapter,
+  ) {}
+
+  async executeSeed() {
+
+    // Eliminamos todos los datos de la BD pára que no guarde registros duplicados
+    await this.pokemonModel.deleteMany({});
+
+
+    const data = await this.http.get<PokeResponse>(
+      'https://pokeapi.co/api/v2/pokemon?limit=1000',
+    );
+
+    // Array que tendra almacenada las promesas
+    const pokemonToInsert: {name:string, no:number}[] = [];
+
+    //Recorremos la data para obtener  el nombre y la url
+    data.results.forEach(async ({ name, url }) => {
+      // Realizamos un split a la URL y obtendremos la posicion en donde se encuentra el no del Pokemon
+      const segments = url.split('/');
+      console.log(segments);
+      const no: number = +segments[segments.length - 2];
+
+      //const pokemon = await this.pokemonModel.create({name,no})
+
+
+      // Almacenamos las promesas en el array
+      pokemonToInsert.push({ name, no });
+    });
+
+    // Ejecutamos la promesa para que se creen los datos
+    const newArray = await this.pokemonModel.insertMany(pokemonToInsert);
+
+    return {...newArray};
+  }
+}
+
+
+** Paginacion de pokemon
+
+- Tenemos en el controlador el metodo que consulta todo lo de la base de datos
+
+  @Get()
+  findAll() {
+    return this.pokemonService.findAll();
+  }
+
+
+- Agregamos la consulta en el servicio
+
+
+  findAll() {
+    return this.pokemonModel.find();
+  }
+
+
+- Podriamos utilizarun las siguientes opciones desde el servicio
+
+  findAll() {
+    return this.pokemonModel.find()
+    .limit(5)// Muestre los 5 primeros
+    .skip(5)// se salta los 5 primeros
+  }
+
+
+-- Podemos tambien recibir los query parameters
+
+  @Get()
+  findAll(@Query() queryParameters) {
+    console.log(queryParameters)
+    return this.pokemonService.findAll();
+  }
+
+
+- Pero crearemos una carpeta llamada dto dentro de common y el siguiente dto pagination.dto.ts
+
+
+import { IsNumber, IsOptional, IsPositive, Min } from "class-validator";
+
+import { IsNumber, IsOptional, IsPositive, Min } from "class-validator";
+
+export class PaginationDto {
+
+
+    @IsOptional()
+    @IsPositive()
+    @IsNumber()
+    @Min(1)
+    limit?: number;
+
+
+    
+    @IsOptional()
+    @IsPositive()
+    @IsNumber()
+    offset?: number;
+
+}
+- Agregamos el dto como tipo de datos para el queryparameters
+
+  @Get()
+  findAll(@Query() paginationDto: PaginationDto ) {
+    console.log(paginationDto)
+    return this.pokemonService.findAll();
+  }
+
+
+** Transformamos el DTO para recibir los datos del query parameters
+
+- Agregamos una configuracion en main para  que transforme nuestros pipe
+
+  // Para trabajar con los pipes de class validatir
+  app.useGlobalPipes(
+    new ValidationPipe({
+    whitelist: true,
+    forbidNonWhitelisted: true,
+    transform: true,
+    transformOptions:{
+      enableImplicitConversion: true
+    }
+    })
+    );
+
+- Enviamos el Query parametros desde el controlador al servicio
+
+ @Get()
+  findAll(@Query() paginationDto: PaginationDto ) {
+  
+    return this.pokemonService.findAll(paginationDto);
+  }
+
+- Recibimos el query parametro en el servicio y mandamos las variables a los parametros parar que muestre
+los filtros
+
+  findAll(paginationDto:PaginationDto) {
+
+    const {limit = 10, offset=0} = paginationDto;
+    return this.pokemonModel.find()
+    .limit(limit)// Muestre los 5 primeros
+    .skip(offset)// se salta los 5 primeros
+  }
+
+
+YA podemos utilizar la consulta con paginacion
+
+http://localhost:3000/api/v2/pokemon?limit=3&offset=2
