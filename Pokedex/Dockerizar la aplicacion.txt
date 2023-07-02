@@ -1,0 +1,329 @@
+** Configuracion de variables de entorno
+
+- Crear un archivo llamado .env en la raiz del proyecto
+
+- Agregar el .env en el git ignore
+
+- Pasamos la URL de mongo al archivo de .env
+
+MONGODB=mongodb://localhost:27017/nest-pokemon
+
+PORT=3000
+
+- La aplicacion de node ya trabaja con variables de entorno, si queremos
+podemos verificarlo imprimiendo dentro de la calse de app.module
+
+import { Module } from '@nestjs/common';
+import { ServeStaticModule } from '@nestjs/serve-static';
+import { join } from 'path';
+import { PokemonModule } from './pokemon/pokemon.module';
+import { MongooseModule } from '@nestjs/mongoose';
+import { CommonModule } from './common/common.module';
+import { SeedModule } from './seed/seed.module';
+
+@Module({
+  imports: [
+
+    ServeStaticModule.forRoot({
+      rootPath: join(__dirname,'..','public'),
+      }),
+
+      MongooseModule.forRoot('mongodb://localhost:27017/nest-pokemon'),
+    PokemonModule,
+    CommonModule,
+    SeedModule
+  ],
+})
+export class AppModule {
+
+  constructor(){
+    console.log(process.env)
+  }
+
+}
+
+
+Esto mostrara todas las variables de entorno configuradas
+
+- Para que se vean las variables que nosotros creamos debemos hace rlo siguiente
+
+yarn add @nestjs/config
+
+
+- Lo importamos en el modulo cambiando la url por la variable configurada
+
+import { Module } from '@nestjs/common';
+import { ServeStaticModule } from '@nestjs/serve-static';
+import { join } from 'path';
+import { PokemonModule } from './pokemon/pokemon.module';
+import { MongooseModule } from '@nestjs/mongoose';
+import { CommonModule } from './common/common.module';
+import { SeedModule } from './seed/seed.module';
+import { ConfigModule } from '@nestjs/config';
+
+@Module({
+  imports: [
+
+    ConfigModule.forRoot(),
+
+    ServeStaticModule.forRoot({
+      rootPath: join(__dirname,'..','public'),
+      }),
+
+      MongooseModule.forRoot(process.env.MONGODB),
+    PokemonModule,
+    CommonModule,
+    SeedModule
+  ],
+})
+export class AppModule {
+
+  constructor(){
+    console.log(process.env)
+  }
+
+}
+
+
+- Lo cambiamos en el main cambiando el puerto por la variable configurada.
+
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from './app.module';
+import { ValidationPipe } from '@nestjs/common';
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+
+
+  // De esta manera podemos colocar un prefijo para las api
+  // Se consumiria asi http://localhost:3000/api/v2/pokemon
+  app.setGlobalPrefix('api/v2');
+
+
+  // Para trabajar con los pipes de class validatir
+  app.useGlobalPipes(
+    new ValidationPipe({
+    whitelist: true,
+    forbidNonWhitelisted: true,
+    transform: true,
+    transformOptions:{
+      enableImplicitConversion: true
+    }
+    })
+    );
+
+
+  await app.listen(process.env.PORT);
+}
+bootstrap();
+
+
+**  Configuration Loader
+
+Colocar siempre al inicio el ConfigurationRoot
+
+import { Module } from '@nestjs/common';
+import { ServeStaticModule } from '@nestjs/serve-static';
+import { join } from 'path';
+import { PokemonModule } from './pokemon/pokemon.module';
+import { MongooseModule } from '@nestjs/mongoose';
+import { CommonModule } from './common/common.module';
+import { SeedModule } from './seed/seed.module';
+import { ConfigModule } from '@nestjs/config';
+
+@Module({
+  imports: [
+
+    ConfigModule.forRoot(),
+
+    ServeStaticModule.forRoot({
+      rootPath: join(__dirname,'..','public'),
+      }),
+
+      MongooseModule.forRoot(process.env.MONGODB),
+    PokemonModule,
+    CommonModule,
+    SeedModule
+  ],
+})
+export class AppModule {
+
+  constructor(){
+    console.log(process.env)
+  }
+
+}
+
+
+- Crear una variable de entorno que almacene el valor limite por defecto
+
+
+DEFAULT_LIMIT=5
+
+
+- Agregamos la variable de entorno en el servicio de Get pokemon
+
+ findAll(paginationDto:PaginationDto) {
+
+    const {limit = +process.env.DEFAULT_LIMIT, offset=0} = paginationDto;
+    return this.pokemonModel.find()
+    .limit(limit)// Muestre los 5 primeros
+    .skip(offset)// se salta los 5 primeros
+  }
+
+
+Si no se configura esa variable de entorno para el limite, se mostrara un NaN y mostraran todos los datos almacenados sin limite
+
+ - Para mejorar y mapear las variables de entorno realizaremos lo siguiente
+
+C rear una carpeta llamda config
+Crear un archivo llamado env.config.ts o app.config.ts
+
+Agregamos esta funcion que mapeara las variables de entorno que tenemos y si no estan
+configurado, se coloca un valor por defecto despúes de los pipes ||
+
+export const EnvConfiguration = () => ({
+    enviroment: process.env.NODE_ENV || 'dev',
+    mongodb: process.env.MONGODB,
+    port: process.env.PORT || 3002,
+    defaulLimit: process.env.DEFAULT_LIMIT || 7
+});
+
+
+- Agregamos la configuracion  en el COnfigureModule de app.module
+
+import { Module } from '@nestjs/common';
+import { ServeStaticModule } from '@nestjs/serve-static';
+import { join } from 'path';
+import { PokemonModule } from './pokemon/pokemon.module';
+import { MongooseModule } from '@nestjs/mongoose';
+import { CommonModule } from './common/common.module';
+import { SeedModule } from './seed/seed.module';
+import { ConfigModule } from '@nestjs/config';
+import { EnvConfiguration } from './config/app.config';
+
+@Module({
+  imports: [
+
+    ConfigModule.forRoot({
+      load:[EnvConfiguration]
+    }),
+
+    ServeStaticModule.forRoot({
+      rootPath: join(__dirname,'..','public'),
+      }),
+
+      MongooseModule.forRoot(process.env.MONGODB),
+    PokemonModule,
+    CommonModule,
+    SeedModule
+  ],
+})
+export class AppModule {
+
+  constructor(){
+    console.log(process.env)
+  }
+
+}
+
+
+** ConfigurationService
+
+- Importar el configModule en el module de pokemon
+
+import { Module } from '@nestjs/common';
+import { PokemonService } from './pokemon.service';
+import { PokemonController } from './pokemon.controller';
+import { Pokemon, PokemonSchema } from './entities/pokemon.entity';
+import { MongooseModule } from '@nestjs/mongoose';
+import { ConfigModule } from '@nestjs/config';
+
+@Module({
+  controllers: [PokemonController],
+  providers: [PokemonService],
+  imports: [
+    ConfigModule,
+    MongooseModule.forFeature([
+      {
+        name: Pokemon.name,
+        schema: PokemonSchema
+      }
+    ])
+  ],
+  exports: [
+   
+    MongooseModule
+  ]
+})
+export class PokemonModule {}
+
+
+- inyectar el ConfigService que nos permitira acceder a las variables de app.config
+
+export class PokemonService {
+  // Inyectar en el contructor el provider de mongoose para crear el modelo
+  constructor(
+    @InjectModel(Pokemon.name)
+    private readonly pokemonModel: Model<Pokemon>,
+    private readonly configService: ConfigService,
+  ) {
+
+    console.log(process.env.DEFAULT_LIMIT)
+    const defaultLimit = configService.get<number>('defaultLimit')
+    console.log(defaultLimit)
+
+  }
+
+
+- Para obtener los valores de la clase app.config utilizaremos el configService que acabamos de importar
+
+
+por ejemplo
+
+export class PokemonService {
+  // Inyectar en el contructor el provider de mongoose para crear el modelo
+  constructor(
+    @InjectModel(Pokemon.name)
+    private readonly pokemonModel: Model<Pokemon>,
+    private readonly configService: ConfigService,
+  ) {
+
+    console.log(process.env.DEFAULT_LIMIT)
+    const defaultLimit = configService.get<number>('defaultLimit')
+    console.log(defaultLimit)
+
+  }}
+
+
+- Agegamos  la variable dentro de la funcion para get
+
+  findAll(paginationDto:PaginationDto) {
+
+    const {limit = this.configService.get<number>('defaultLimit'), offset=0} = paginationDto;
+    return this.pokemonModel.find()
+    .limit(limit)// Muestre los 5 primeros
+    .skip(offset)// se salta los 5 primeros
+  }
+
+- Para mejorar lo hacemos asi:
+
+Creamos esta propiedad de la clase
+  private defaultLimit: number;
+
+Modificamos la funcion
+
+ findAll(paginationDto:PaginationDto) {
+
+    this.defaultLimit = this.configService.get<number>('defaultLimit')
+
+    const {limit = this.defaultLimit, offset=0} = paginationDto;
+    return this.pokemonModel.find()
+    .limit(limit)// Muestre los 5 primeros
+    .skip(offset)// se salta los 5 primeros
+  }
+
+-  Si comentamos la variable de entorno de mongoDb se generar un error.
+
+
+
