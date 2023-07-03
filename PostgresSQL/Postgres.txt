@@ -1,0 +1,318 @@
+** ORM
+
+https://www.google.com/search?q=orm&oq=orm&aqs=chrome..69i57l2j69i59j69i60.642j0j7&sourceid=chrome&ie=UTF-8
+
+- TYPEORM
+
+https://typeorm.io/
+
+- Crear una aplicacion de nest
+
+nest new teslo-shop
+
+** Instalar Docker
+
+- Crear un archivo .env y colocar las credenciales para la base de datos
+
+DB_PASSWORD=MySecr3etPassword@as2
+DB_NAME=TesloDB
+
+- Crear el archivo docker-compose.yaml con la siguiente config
+
+version: '3'
+
+
+services:
+  db:
+    image: postgres:14.3
+    restart: always
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}  
+      POSTGRES_DB: ${DB_NAME}
+    container_name: teslodb
+    volumes:
+      - ./postgres:/var/lib/postgresql/data  
+
+- Levantar la base de dato 
+
+docker-compose up 
+
+si no tiene el -d, hace que que si bajo la aplicacion backend tambien se baja el contenedor
+
+- Nops conectamos con table plus
+
+DB_PASSWORD=MySecr3etPassword@as2
+DB_NAME=TesloDB
+
+
+**  Conectar NEst con postgres
+
+https://docs.nestjs.com/techniques/database
+
+- Instalar config
+
+yarn add @nestjs/config
+
+- INyectarlo en el app.modules
+
+import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+
+@Module({
+  imports: [
+    ConfigModule.forRoot()
+  ],
+
+})
+export class AppModule {}
+
+
+- Instalar Tyoe ORM
+
+yarn add @nestjs/typeorm typeorm
+
+- Agregamos la data necesaria para la conexion a la base de datos en .env
+
+DB_HOST=localhost
+DB_PORT = 5432
+DB_USERNAME=postgres
+DB_PASSWORD=MySecr3etPassword@as2
+DB_NAME=TesloDB
+
+- Lo INyectamos en app.mopdule
+
+import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+import { TypeOrmModule } from '@nestjs/typeorm';
+
+@Module({
+  imports: [
+    
+    ConfigModule.forRoot(),
+    
+    TypeOrmModule.forRoot({
+      type: 'postgres',
+      host: process.env.DB_HOST,
+      port: +process.env.DB_PORT,
+      database: process.env.DB_NAME,
+      username: process.env.DB_USERNAME,
+      password: process.env.DB_PASSWORD,
+      autoLoadEntities: true, => Esto carga automaticamente las entidades
+      synchronize: true => esto sincroniza automaticamente los cambios, no se recomienda en produccion
+
+    })],
+})
+export class AppModule {}
+
+
+- INstalar POstgres
+
+yarn add pg
+
+Bajar y subir el servicio
+
+** Entity¨Product
+
+https://gist.github.com/Klerith/1fb1b9f758bb0c5b2253dfc94f09e1b6
+
+- Crear un recurso llamado productos
+
+nest g res products --no-spec
+
+- en el archivo product.entity.ts agregamos los campos que necesitamos
+
+Los decoradores se importan de typeorm
+
+
+import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+
+@Entity()
+export class Product {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column('text', {
+    unique: true,
+  })
+  title: string;
+}
+
+
+- Importamos la entidad en el products module
+
+import { Module } from '@nestjs/common';
+import { ProductsService } from './products.service';
+import { ProductsController } from './products.controller';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { Product } from './entities/product.entity';
+
+@Module({
+  controllers: [ProductsController],
+  providers: [ProductsService],
+  imports:[
+    TypeOrmModule.forFeature([Product])
+  ]
+})
+export class ProductsModule {}
+
+Al guiardar los cambios observaremos que ya se creo la tabla en la base de datos y algunas
+funciones para uuid
+
+
+** Entidad sin relaciones
+
+- Si agregamos una nueva columna hay que tener en cuenta el tipo de valor de  loa base de datos
+
+Por ejemplo, postgres no tiene number si no , numeric
+
+
+  @Column('numeric',{
+    default: 0
+  })
+  price: number
+
+ - Podemos agregar mas campos, como array , numerci etc
+
+import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+
+@Entity()
+export class Product {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column('text', {
+    unique: true,
+  })
+  title: string;
+
+  @Column('numeric', {
+    default: 0,
+  })
+  price: number;
+
+  @Column({
+    type: 'text',
+    nullable: true,
+  })
+  description: string;
+
+  @Column('text', {
+    unique: true,
+  })
+  slug: string;
+
+  @Column('int', {
+    default: 0,
+  })
+  stock: number;
+
+  @Column('text', {
+    array: true,
+  })
+  sizes: string[];
+
+  @Column('text')
+  gender: string;
+
+  //tags
+  //images
+}
+
+
+** Create Producto DTO
+
+- Agregamos el prefijo en el main para que se coloque api
+
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from './app.module';
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+
+
+  app.setGlobalPrefix('api')
+
+  await app.listen(3000);
+}
+bootstrap();
+
+
+
+- Crear el DTO
+
+instalar class validator y class transformer
+
+yarn add class-validator class-transformer
+
+Configuramos el pipe en el main
+
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from './app.module';
+import { ValidationPipe } from '@nestjs/common';
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+
+  app.setGlobalPrefix('api');
+
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    }),
+  );
+
+  await app.listen(3000);
+}
+bootstrap();
+
+
+- Creamos el DTO para el create con las validaciones
+
+import { IsArray, IsIn, IsInt, IsNumber, IsOptional, 
+    IsPositive, IsString, MinLength 
+} from 'class-validator';
+
+
+export class CreateProductDto {
+
+    @IsString()
+    @MinLength(1)
+    title: string;
+
+    @IsNumber()
+    @IsPositive()
+    @IsOptional()
+    price?: number;
+
+    @IsString()
+    @IsOptional()
+    description?: string;
+
+    @IsString()
+    @IsOptional()
+    slug?: string;
+
+    @IsInt()
+    @IsPositive()
+    @IsOptional()
+    stock?: number; 
+
+    // Indicamos que es un arreglo de string
+    @IsString({ each: true })
+    @IsArray()
+    sizes: string[]
+
+    // Que este dentro de estos valores configurados
+    @IsIn(['men','women','kid','unisex'])
+    gender: string;
+
+    // @IsString({ each: true })
+    // @IsArray()
+    // @IsOptional()
+    // tags: string[];
+
+
+}
