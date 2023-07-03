@@ -326,4 +326,296 @@ Modificamos la funcion
 -  Si comentamos la variable de entorno de mongoDb se generar un error.
 
 
+** Joi Validation Schema
+
+https://www.npmjs.com/package/joi
+Este paquete nos ayudara a validar errores, como por ejemplo los de las variables de entorno
+
+yarn add joi
+
+- Creamos un archivo llamado joi.validation.ts dentro de la carpeta config
+
+import * as Joi from 'joi'
+
+
+
+export const JoiValidationSchema = Joi.object({
+
+    // Crear reglas de validacion para las variables de entorno
+
+    MONGODB: Joi.required(),
+    PORT: Joi.number().default(3005),
+    DEFAUL_LIMIT: Joi.number().default(6)
+
+
+})
+
+- Impoortamos el validationSquema dentro del ap.module
+
+import { Module } from '@nestjs/common';
+import { ServeStaticModule } from '@nestjs/serve-static';
+import { join } from 'path';
+import { PokemonModule } from './pokemon/pokemon.module';
+import { MongooseModule } from '@nestjs/mongoose';
+import { CommonModule } from './common/common.module';
+import { SeedModule } from './seed/seed.module';
+import { ConfigModule } from '@nestjs/config';
+import { EnvConfiguration } from './config/app.config';
+import { JoiValidationSchema } from './config/joi.validation';
+
+@Module({
+  imports: [
+
+    ConfigModule.forRoot({
+      load:[EnvConfiguration],
+      validationSchema: JoiValidationSchema
+    }),
+
+    ServeStaticModule.forRoot({
+      rootPath: join(__dirname,'..','public'),
+      }),
+
+      MongooseModule.forRoot(process.env.MONGODB),
+    PokemonModule,
+    CommonModule,
+    SeedModule
+  ],
+})
+export class AppModule {
+
+  constructor(){
+  
+  }
+
+}
+
+
+- Si comentamos el puerto  y volvemos a levantar el servicio, observaremos que estara tomando el valor del
+validationSchema
+
+
+MONGODB=mongodb://localhost:27017/nest-pokemon
+
+
+# DEFAULT_LIMIT=5
+# PORT=3000
+
+http://localhost:3005/api/v2/pokemon
+
+Podemos hacer una copia del .env y lo renombramos a .env.template con el fin de documentar el .env, este
+si lo podriamos subir al repositorio
+
+Agregar indicaciones en el readme
+
+5. Clonar el archivo ```.env.template``` y renombrar la copia a ```.env```
+
+6. Llenar las variables de entorno definida
+
+7. Ejecutar la aplicacion en dev:
+
+```yarn start:dev```
+
+**  Mongo Atlas - Mongo en la nube
+
+https://www.mongodb.com/atlas/database
+
+Iniciar sesion
+
+Seleccionar crear base de datos
+
+Opcionm Shared
+
+Cluster Datails -> Cambiamos el nombre en Cluster name
+
+
+- Creamos un nuevo usuario
+
+user => pokemon_user
+pasword => l1z9qxerR5Ck76Gx
+
+
+- Vamos a la opcion de connect y sleccionamos conetar con mongo compass
+
+- Esto lo hacemos para copiar la URL de conexion
+
+mongodb+srv://<username>:<password>@servidor.acv45.mongodb.net/
+
+Ya yo tenia un servidor creado anterior mente
+
+Renombramos la cadena de conexion con la del usuario creado en la variable de entorno
+
+# MONGODB=mongodb://localhost:27017/nest-pokemon
+
+MONGODB=mongodb+srv://pokemon_user:l1z9qxerR5Ck76Gx@servidor.acv45.mongodb.net/nest-pokemon
+
+
+
+DEFAULT_LIMIT=5
+
+PORT=3000
+
+Probar la URL en table plus
+mongodb+srv://pokemon_user:l1z9qxerR5Ck76Gx@servidor.acv45.mongodb.net/nest-pokemon
+
+
+** Desplegar aplicacion en la nube
+
+Utilizar Heroku para desplegar la aplicacion
+
+https://www.heroku.com/
+
+para ejecutar la app en produccion normalmente se eejcutan los script
+
+"build": "nest build", => Traspila de TS a JS
+
+ "start:prod": "node dist/main", =>  Ejecutar la aplicacion en prod
+
+  "start": "nest start",
+
+Como Heroku tiene una forma especifica de desplegar aplicaciones de node debemos hacer los
+siguiente
+
+Cambiamos el script para que Heroku lo tome por defecto
+
+    "start": "node dist/main",
+    "start:prod": "nest start",
+
+Debemos asegurarnos que el main tenga como puerto la variable de entorno
+
+  await app.listen(process.env.PORT);
+
+- Crear cuenta en Heroku
+
+gabrielbetinvaldes@gmail.com
+Domayor7@
+
+insttala salesforce Authenticator en el movil
+
+Heroku permite hasta 5 aplicaciones, despues de la 5 hay que colocar la tarjeta de credito
+
+cada 1/2 se suspende la app
+
+- Crear aplicacion y colocar el nombre
+
+pokedex-gabobetin
+
+Heroku no es gratis ya
+
+- Instalar Heroku CLI y seguir pasos.
+https://devcenter.heroku.com/articles/heroku-cli
+
+No practicare esto porque Heroku ya no es gratis
+
+** Dockerizar????
+
+Prperar la aplicacion para que sea un contenedor
+
+
+** Explicacion del DockerFile
+
+https://gist.github.com/Klerith/e7861738c93712840ab3a38674843490
+
+- Eliminar la imagen del docker que ya teniamos
+
+- Crear un archivo llamado Dockerfile
+
+FROM node:18-alpine3.15
+
+# Set working directory
+RUN mkdir -p /var/www/pokedex
+WORKDIR /var/www/pokedex
+
+# Copiar el directorio y su contenido
+COPY . ./var/www/pokedex
+COPY package.json tsconfig.json tsconfig.build.json /var/www/pokedex/
+RUN yarn install --prod
+RUN yarn build
+
+
+# Dar permiso para ejecutar la applicación
+RUN adduser --disabled-password pokeuser
+RUN chown -R pokeuser:pokeuser /var/www/pokedex
+USER pokeuser
+
+# Limpiar el caché
+RUN yarn cache clean --force
+
+EXPOSE 3000
+
+CMD [ "yarn","start" ]
+
+
+- Al usuar este comando levantara el contenedor
+
+docker-compose up -d
+
+- crear .dockerignore para que no se copie en las carpetas configurada en Dockerfile
+
+dist/
+node_modules/
+.gitignore
+.git/
+
+** Construir la imagen
+
+Reemplazar esta informacion en el archivo Dockerfile
+
+# Install dependencies only when needed
+FROM node:18-alpine3.15 AS deps
+# Check https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine to understand why libc6-compat might be needed.
+RUN apk add --no-cache libc6-compat
+WORKDIR /app
+COPY package.json yarn.lock ./
+RUN yarn install --frozen-lockfile
+
+# Build the app with cache dependencies
+FROM node:18-alpine3.15 AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+RUN yarn build
+
+
+# Production image, copy all the files and run next
+FROM node:18-alpine3.15 AS runner
+
+# Set working directory
+WORKDIR /usr/src/app
+
+COPY package.json yarn.lock ./
+
+RUN yarn install --prod
+
+COPY --from=builder /app/dist ./dist
+
+# # Copiar el directorio y su contenido
+# RUN mkdir -p ./pokedex
+
+# COPY --from=builder ./app/dist/ ./app
+# COPY ./.env ./app/.env
+
+# # Dar permiso para ejecutar la applicación
+# RUN adduser --disabled-password pokeuser
+# RUN chown -R pokeuser:pokeuser ./pokedex
+# USER pokeuser
+
+# EXPOSE 3000
+
+CMD [ "node","dist/main" ]
+
+
+- Crear archivo y copiar lo que esta en el gits de docker-compose.prod.yaml
+
+
+
+
+
+
+
+
+
+
+
+
+
 
