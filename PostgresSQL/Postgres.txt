@@ -316,3 +316,356 @@ export class CreateProductDto {
 
 
 }
+
+
+** Insertando con TypeORM
+
+- Corregir el tipo de datos del precio en la entity, a float
+
+import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+
+@Entity()
+export class Product {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column('text', {
+    unique: true,
+  })
+  title: string;
+
+  @Column('float', {
+    default: 0,
+  })
+  price: number;
+
+  @Column({
+    type: 'text',
+    nullable: true,
+  })
+  description: string;
+
+  @Column('text', {
+    unique: true,
+  })
+  slug: string;
+
+  @Column('int', {
+    default: 0,
+  })
+  stock: number;
+
+  @Column('text', {
+    array: true,
+  })
+  sizes: string[];
+
+  @Column('text')
+  gender: string;
+
+  //tags
+  //images
+}
+
+- Inyectamos el patron repositorio de TypeOrm
+
+import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { CreateProductDto } from './dto/create-product.dto';
+import { UpdateProductDto } from './dto/update-product.dto';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Product } from './entities/product.entity';
+import { Repository } from 'typeorm';
+
+@Injectable()
+export class ProductsService {
+
+  // Patron repositorio de  type ORm
+  constructor(
+
+    // Inyectamos el repositorio que recibe un Product y es de tipo Product
+    @InjectRepository(Product)
+    private readonly productRepository: Repository<Product>,
+
+
+  ){
+
+  }
+
+
+- Agregamos la funcion que crea el producto
+
+  async create(createProductDto: CreateProductDto) {
+
+    try {
+
+      // Crear instancia del producto 
+      const product = this.productRepository.create(createProductDto)
+      
+      // Grabamos el producto en la base de datos
+      await this.productRepository.save(product);
+
+      // Retornamos el producto
+      return product;
+
+      
+
+    } catch (error) {
+      console.log(error)
+      throw new  InternalServerErrorException('Ayuda!');
+    }
+    
+
+
+  }
+
+- Probamos el endpoint de post
+
+{
+    "title":"Gabriel´s shirt2",
+    "sizes":["SM", "M", "L"],
+    "gender":"men",
+    "slug": "fernando_shirt"
+}
+
+
+** Manejo de errores
+
+- Instanciamos el logger de common para mostrar los errores
+
+export class ProductsService {
+  // instanciamos el Logger de nest common para mostrar los errores
+  // Recibe la clase de donde quiero el logger
+  private readonly logger = new Logger('ProductsService');
+
+  // Patron repositorio de  type ORm
+  constructor(
+    // Inyectamos el repositorio que recibe un Product y es de tipo Product
+    @InjectRepository(Product)
+    private readonly productRepository: Repository<Product>,
+  ) {}
+
+- En el catch cambiamos el console log por el logger
+
+  async create(createProductDto: CreateProductDto) {
+    try {
+      // Crear instancia del producto
+      const product = this.productRepository.create(createProductDto);
+
+      // Grabamos el producto en la base de datos
+      await this.productRepository.save(product);
+
+      // Retornamos el producto
+      return product;
+    } catch (error) {
+      this.logger.error(error);
+      throw new InternalServerErrorException('Ayuda!');
+    }
+  }
+
+En la consola tendriamos lo siquiente
+
+ERROR [ProductsService] QueryFailedError: duplicate key value violates 
+unique constraint "UQ_f7bf944ad9f1034110e8c2133ab"
+
+
+- Podriamos hacer lo siguiente para ser mas especificico
+
+
+  async create(createProductDto: CreateProductDto) {
+    try {
+      // Crear instancia del producto
+      const product = this.productRepository.create(createProductDto);
+
+      // Grabamos el producto en la base de datos
+      await this.productRepository.save(product);
+
+      // Retornamos el producto
+      return product;
+    } catch (error) {
+
+      // Especificamos un error
+      if(error.code === '23505')
+        throw new BadRequestException(error.detail);
+      
+
+
+      //this.logger.error(error);
+      throw new InternalServerErrorException('Unexpected error, check server error!');
+    }
+  }
+
+- Este error lo podemos convertir en un metodo para reutilizarlo
+
+  private handleDbExceptions(error: any) {
+    // Especificamos un error
+    if (error.code === '23505') throw new BadRequestException(error.detail);
+
+    this.logger.error(error);
+    throw new InternalServerErrorException(
+      'Unexpected error, check server error!',
+    );
+  }
+
+- En el metodo de crear invocamos el metodo
+
+ async create(createProductDto: CreateProductDto) {
+    try {
+      // Crear instancia del producto
+      const product = this.productRepository.create(createProductDto);
+
+      // Grabamos el producto en la base de datos
+      await this.productRepository.save(product);
+
+      // Retornamos el producto
+      return product;
+    } catch (error) {
+      this.handleDbExceptions(error)
+    }
+  }
+
+** BeforeInsert y  BeforeUpdate
+
+- Si el campo slug no viene podriamos  validarlo y autocompletarlo asi
+
+     // Validamos si viene el campó slug para autocompletarlo
+        if(!createProductDto.slug){
+          createProductDto.slug = createProductDto.title
+            .toLocaleLowerCase()
+            .replaceAll(' ', '_')
+            .replaceAll("'", ' ')
+        }else{
+          createProductDto.slug = createProductDto.slug
+          .toLocaleLowerCase()
+          .replaceAll(' ', '_')
+          .replaceAll("'", ' ')
+
+        }
+
+Tener en cuenta que el replaceAll pueda que no este en la version del EsmatScrpt
+
+por esto, cambiamos la version en el tsconfig
+
+ "target": "ES2022",
+
+Si probamos el insert sin mandar el slug,l veremos que la app lo creara
+
+
+ - Para mejorar esto, vamos a utilizar con un procedimiento que se ejecute antes de insertarse en la base de datios 
+en el DTO
+
+  @BeforeInsert()
+  checkSlugInsert(){
+
+        // Validamos si viene el campó slug para autocompletarlo
+        if(!this.slug){
+          this.slug = this.title
+        }  
+        
+        this.slug = this.slug
+          .toLocaleLowerCase()
+          .replaceAll(' ', '_')
+          .replaceAll("'", ' ')
+      
+
+  }
+
+
+import { BeforeInsert, Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+
+@Entity()
+export class Product {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column('text', {
+    unique: true,
+  })
+  title: string;
+
+  @Column('float', {
+    default: 0,
+  })
+  price: number;
+
+  @Column({
+    type: 'text',
+    nullable: true,
+  })
+  description: string;
+
+  @Column('text', {
+    unique: true,
+  })
+  slug: string;
+
+  @Column('int', {
+    default: 0,
+  })
+  stock: number;
+
+  @Column('text', {
+    array: true,
+  })
+  sizes: string[];
+
+  @Column('text')
+  gender: string;
+
+  //tags
+  //images
+
+  @BeforeInsert()
+  checkSlugInsert(){
+
+        // Validamos si viene el campó slug para autocompletarlo
+        if(!this.slug){
+          this.slug = this.title
+        }  
+        
+        this.slug = this.slug
+          .toLocaleLowerCase()
+          .replaceAll(' ', '_')
+          .replaceAll("'", ' ')
+      
+
+  }
+}
+
+
+- Quitamos el codigo que teniamos en el servicio
+
+  async create(createProductDto: CreateProductDto) {
+    try {
+
+        // // Validamos si viene el campó slug para autocompletarlo
+        // if(!createProductDto.slug){
+        //   createProductDto.slug = createProductDto.title
+        //     .toLocaleLowerCase()
+        //     .replaceAll(' ', '_')
+        //     .replaceAll("'", ' ')
+        // }else{
+        //   createProductDto.slug = createProductDto.slug
+        //   .toLocaleLowerCase()
+        //   .replaceAll(' ', '_')
+        //   .replaceAll("'", ' ')
+
+        // }
+
+
+      // Crear instancia del producto
+      const product = this.productRepository.create(createProductDto);
+
+      // Grabamos el producto en la base de datos
+      await this.productRepository.save(product);
+
+      // Retornamos el producto
+      return product;
+    } catch (error) {
+      this.handleDbExceptions(error)
+    }
+  }
+
+
+** 
+
+
