@@ -3,12 +3,16 @@ import {
   Injectable,
   InternalServerErrorException,
   Logger,
+  NotFoundException,
 } from '@nestjs/common';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Product } from './entities/product.entity';
 import { Repository } from 'typeorm';
+import { PaginationDto } from 'src/common/dtos/pagination.dto';
+import { validate as isUUID } from 'uuid';
+
 
 @Injectable()
 export class ProductsService {
@@ -54,20 +58,51 @@ export class ProductsService {
     }
   }
 
-  findAll() {
-    return `This action returns all products`;
+  findAll(paginationDto: PaginationDto) {
+
+    const {limit = 10 , offset=0} = paginationDto;
+
+    return this.productRepository.find({
+      take: limit,
+      skip: offset
+    });
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} product`;
+  async findOne(term: string) {
+
+   //const product =  await this.productRepository.findOneBy({id}); 
+   
+   let product: Product;
+ 
+   if( isUUID(term)){
+    product = await this.productRepository.findOneBy({id: term})
+   }else{
+    // product = await this.productRepository.findOneBy({slug: term})
+
+    // Utilizar el Query Builder
+    const queryBuilder = this.productRepository.createQueryBuilder();
+    product = await queryBuilder
+      .where(`UPPER(title) =:title or slug =:slug`, {
+        title: term.toLocaleUpperCase(),
+        slug: term.toLocaleLowerCase()
+      }).getOne();
+   }
+
+   
+   if(!product)
+      throw new NotFoundException(`Product whit id ${term} not found`);
+   
+    return product;
   }
 
   update(id: number, updateProductDto: UpdateProductDto) {
     return `This action updates a #${id} product`;
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} product`;
+  async remove(id: string) {
+
+    const product = await this.findOne(id);
+    await this.productRepository.remove(product);
   }
 
 
