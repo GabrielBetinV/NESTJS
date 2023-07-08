@@ -13,7 +13,6 @@ import { Repository } from 'typeorm';
 import { PaginationDto } from 'src/common/dtos/pagination.dto';
 import { validate as isUUID } from 'uuid';
 
-
 @Injectable()
 export class ProductsService {
   // instanciamos el Logger de nest common para mostrar los errores
@@ -29,21 +28,19 @@ export class ProductsService {
 
   async create(createProductDto: CreateProductDto) {
     try {
+      // // Validamos si viene el campó slug para autocompletarlo
+      // if(!createProductDto.slug){
+      //   createProductDto.slug = createProductDto.title
+      //     .toLocaleLowerCase()
+      //     .replaceAll(' ', '_')
+      //     .replaceAll("'", ' ')
+      // }else{
+      //   createProductDto.slug = createProductDto.slug
+      //   .toLocaleLowerCase()
+      //   .replaceAll(' ', '_')
+      //   .replaceAll("'", ' ')
 
-        // // Validamos si viene el campó slug para autocompletarlo
-        // if(!createProductDto.slug){
-        //   createProductDto.slug = createProductDto.title
-        //     .toLocaleLowerCase()
-        //     .replaceAll(' ', '_')
-        //     .replaceAll("'", ' ')
-        // }else{
-        //   createProductDto.slug = createProductDto.slug
-        //   .toLocaleLowerCase()
-        //   .replaceAll(' ', '_')
-        //   .replaceAll("'", ' ')
-
-        // }
-
+      // }
 
       // Crear instancia del producto
       const product = this.productRepository.create(createProductDto);
@@ -54,57 +51,72 @@ export class ProductsService {
       // Retornamos el producto
       return product;
     } catch (error) {
-      this.handleDbExceptions(error)
+      this.handleDbExceptions(error);
     }
   }
 
   findAll(paginationDto: PaginationDto) {
-
-    const {limit = 10 , offset=0} = paginationDto;
+    const { limit = 10, offset = 0 } = paginationDto;
 
     return this.productRepository.find({
       take: limit,
-      skip: offset
+      skip: offset,
     });
   }
 
   async findOne(term: string) {
+    //const product =  await this.productRepository.findOneBy({id});
 
-   //const product =  await this.productRepository.findOneBy({id}); 
-   
-   let product: Product;
- 
-   if( isUUID(term)){
-    product = await this.productRepository.findOneBy({id: term})
-   }else{
-    // product = await this.productRepository.findOneBy({slug: term})
+    let product: Product;
 
-    // Utilizar el Query Builder
-    const queryBuilder = this.productRepository.createQueryBuilder();
-    product = await queryBuilder
-      .where(`UPPER(title) =:title or slug =:slug`, {
-        title: term.toLocaleUpperCase(),
-        slug: term.toLocaleLowerCase()
-      }).getOne();
-   }
+    if (isUUID(term)) {
+      product = await this.productRepository.findOneBy({ id: term });
+    } else {
+      // product = await this.productRepository.findOneBy({slug: term})
 
-   
-   if(!product)
+      // Utilizar el Query Builder
+      const queryBuilder = this.productRepository.createQueryBuilder();
+      product = await queryBuilder
+        .where(`UPPER(title) =:title or slug =:slug`, {
+          title: term.toLocaleUpperCase(),
+          slug: term.toLocaleLowerCase(),
+        })
+        .getOne();
+    }
+
+    if (!product)
       throw new NotFoundException(`Product whit id ${term} not found`);
-   
+
     return product;
   }
 
-  update(id: number, updateProductDto: UpdateProductDto) {
-    return `This action updates a #${id} product`;
+  async update(id: string, updateProductDto: UpdateProductDto) {
+    // Buscamos el objeto por el ID con el preload y hacemos el spread
+    // Al objeto encontrado
+    const product = await this.productRepository.preload({
+      id: id,
+      ...updateProductDto,
+    });
+
+    if (!product)
+      throw new NotFoundException(`Product whit id: ${id} not found`);
+
+    try {
+      // Si encuentra el producto lo actualiza
+      await this.productRepository.save(product);
+
+      return product;
+    } catch (error) {
+
+      this.handleDbExceptions(error);
+
+    }
   }
 
   async remove(id: string) {
-
     const product = await this.findOne(id);
     await this.productRepository.remove(product);
   }
-
 
   private handleDbExceptions(error: any) {
     // Especificamos un error
