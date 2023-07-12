@@ -1049,6 +1049,97 @@ export class CreateProductDto {
 }
 
 
+** relaciones en TypORM
+
+- Crear una nueva entidad para guardar loas urls de la imagen y relacionarla psteriormente con la tabla de product
+
+product-image.entity.ts
+import { Column, Entity, PrimaryGeneratedColumn } from "typeorm";
+
+
+@Entity()
+export class ProductImage{
+
+    @PrimaryGeneratedColumn()
+    id: number;
+
+    @Column('text')
+    url: string;
+
+
+
+}
+
+-  La agregamos en el producto module para que la cree en la base de datos
+
+import { Module } from '@nestjs/common';
+import { ProductsService } from './products.service';
+import { ProductsController } from './products.controller';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { Product } from './entities/product.entity';
+import { ProductImage } from './entities/product-image.entity';
+
+@Module({
+  controllers: [ProductsController],
+  providers: [ProductsService],
+  imports:[
+    TypeOrmModule.forFeature([Product, ProductImage])
+  ]
+})
+export class ProductsModule {}
+
+
+- Para mejorar la importacion, creamos un archivo index dentro de entities para exportar todas las entidadees
+
+export { ProductImage } from "./product-image.entity";
+export { Product } from "./product.entity";
+
+
+
+- Cambiamos la importacion en el product module
+
+import { Module } from '@nestjs/common';
+import { ProductsService } from './products.service';
+import { ProductsController } from './products.controller';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { Product,ProductImage } from './entities';
+
+
+@Module({
+  controllers: [ProductsController],
+  providers: [ProductsService],
+  imports:[
+    TypeOrmModule.forFeature([Product, ProductImage])
+  ]
+})
+export class ProductsModule {}
+
+** OneToMany -  ManyToOne
+
+- Agregar la relacion de un a muchos en el producto para el campo images, ya que un producto 
+podra tener muchas imagenes  - product.entity.ts
+
+ @OneToMany(
+      () => ProductImage,
+      (productImage) => productImage.product,
+      {cascade: true}
+  )
+  images?: ProductImage;
+
+
+- Agregar la relacion de muchos a uno en la entidad de iimagen, por que muchas imagenes pueden tener un productoo
+
+
+    @ManyToOne(
+        () => Product,
+        (product) => product.images
+    )
+    product: Product
+
+** Crear imagenes del producto
+
+
+
 
 
 
