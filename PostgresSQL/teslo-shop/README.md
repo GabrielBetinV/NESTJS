@@ -18,5 +18,7 @@
 
 6. Levantar el servicio
 
+7. Ejecutar seed
+
 ```yarn start:dev```
 

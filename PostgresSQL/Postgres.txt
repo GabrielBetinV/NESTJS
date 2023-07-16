@@ -1444,6 +1444,343 @@ Creamos un metodo para devolver el dato aplanado
   }
 
 
+** Query Runner
+
+https://orkhan.gitbook.io/typeorm/docs/insert-query-builder
+
+Permite eejcutar varias transacciones y commit al final o rollback
+
+- Inyectamos el datasource de TypeOrm
+
+  // Patron repositorio de  type ORm
+  constructor(
+    // Inyectamos el repositorio que recibe un Product y es de tipo Product
+    @InjectRepository(Product)
+    private readonly productRepository: Repository<Product>,
+
+    @InjectRepository(ProductImage)
+    private readonly productImageRepository: Repository<ProductImage>,
+
+    // Inyectamos el Datasource, que conoce la cadena de conexion
+    private readonly dataSource: DataSource,
+  ) {}
+
+- Destructuramos el objeto del update y creamos la constante para el query Runner
+
+
+
+  async update(id: string, updateProductDto: UpdateProductDto) {
+    // Estraer los datos del objeto sin las imagenes, el rest (Que es la data que va a actualizar)
+    const { images, ...toUpdate } = updateProductDto;
+
+    // Hacemos el preload del producto
+    const product = await this.productRepository.preload({
+      id,
+      ...toUpdate,
+    });
+
+    // Buscamos el objeto por el ID con el preload y hacemos el spread
+    // Al objeto encontrado
+    // const product = await this.productRepository.preload({
+    //   id: id,
+    //   ...updateProductDto,
+    //   images: [],
+    // });
+
+    if (!product)
+      throw new NotFoundException(`Product whit id: ${id} not found`);
+
+    // Crear el Query Runner
+    const queryRunner = this.dataSource.createQueryRunner();
+
+
+
+
+    
+
+    try {
+      // Si encuentra el producto lo actualiza
+      await this.productRepository.save(product);
+
+      return product;
+    } catch (error) {
+      this.handleDbExceptions(error);
+    }
+  }
+
+
+** Transacciones
+
+Aca deberemos hacer el commits o Rollback
+
+ async update(id: string, updateProductDto: UpdateProductDto) {
+    // Estraer los datos del objeto sin las imagenes, el rest (Que es la data que va a actualizar)
+    const { images, ...toUpdate } = updateProductDto;
+
+    // Hacemos el preload del producto
+    const product = await this.productRepository.preload({
+      id,
+      ...toUpdate,
+    });
+
+    // Buscamos el objeto por el ID con el preload y hacemos el spread
+    // Al objeto encontrado
+    // const product = await this.productRepository.preload({
+    //   id: id,
+    //   ...updateProductDto,
+    //   images: [],
+    // });
+
+    if (!product)
+      throw new NotFoundException(`Product whit id: ${id} not found`);
+
+    // Crear el Query Runner
+    const queryRunner = this.dataSource.createQueryRunner();
+
+    // Nos conectamos a la base de datos
+    await queryRunner.connect();
+
+    // Iniciamos la transaccion
+    await queryRunner.startTransaction();
+
+    try {
+      // Eliminamos las imagenes anteriores
+      if (images) {
+        // Eliminamos con el query runner, indicamos el id para eliminar
+        await queryRunner.manager.delete(ProductImage, { product: { id } });
+
+        // Guardar las nuevas imagenes, hasta este momento no se a inpactado la base de datos
+        product.images = images.map((image) =>
+          this.productImageRepository.create({ url: image }),
+        );
+      } else {
+        //???????? si no se reciben imagenes, buscamos las imagenes
+        // Esto se hace mejor utilizando
+        product.images = await this.productImageRepository.findBy({product: {id}});
+      }
+
+      //  Guardar el producto, pero aun no se ha echo commits
+      await queryRunner.manager.save(product);
+
+      // Si encuentra el producto lo actualiza
+      //await this.productRepository.save(product);
+
+      // Aca realizamos el commit
+      await queryRunner.commitTransaction();
+      await queryRunner.release();
+
+      return this.findOnePlain(id);
+     // return product;
+    } catch (error) {
+
+      //Aca realizamos el rollback de la transaccion
+      await queryRunner.rollbackTransaction();
+      await queryRunner.release();
+
+      this.handleDbExceptions(error);
+    }
+  }
+
+** eliminacion en cascada
+
+Eliminar las imagenes cuando se borre un producto
+
+Agregamos la eliminacion en cascada en la relacion del product image entity
+
+import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from "typeorm";
+import { Product } from "./product.entity";
+
+
+@Entity()
+export class ProductImage{
+
+    @PrimaryGeneratedColumn()
+    id: number;
+
+    @Column('text')
+    url: string;
+
+    @ManyToOne(
+        () => Product,
+        (product) => product.images,
+        {onDelete: 'CASCADE'}
+    )
+    product: Product
+
+
+}
+
+
+- Si queremos podemos crear un metodo para eliminar todos los productos
+
+async deleteAllProducts(){
+  const query = this.productRepository.createQueryBuilder('product');
+
+  try {
+    
+    return await query
+    .delete()
+    .where({})
+    .execute()
+
+  } catch (error) {
+    this.handleDbExceptions(error);
+    
+  }
+
+
+}
+
+** Product Seed
+
+Trabajar con los datos del profe
+https://gist.github.com/Klerith/1fb1b9f758bb0c5b2253dfc94f09e1b6
+
+
+- Creamos el recurso 
+nest g res seed --no-spec
+
+- Exportamos el servicio de producto y  el typeorem del module de products
+
+import { Module } from '@nestjs/common';
+import { ProductsService } from './products.service';
+import { ProductsController } from './products.controller';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { Product,ProductImage } from './entities';
+
+
+@Module({
+  controllers: [ProductsController],
+  providers: [ProductsService],
+  imports:[
+    TypeOrmModule.forFeature([Product, ProductImage])
+  ],
+  exports:[
+    ProductsService,
+    TypeOrmModule
+  ]
+})
+export class ProductsModule {}
+
+
+- Importamos el modulo en el seed module
+
+import { Module } from '@nestjs/common';
+import { SeedService } from './seed.service';
+import { SeedController } from './seed.controller';
+import { ProductsModule } from 'src/products/products.module';
+
+@Module({
+  controllers: [SeedController],
+  providers: [SeedService],
+  imports:[
+    ProductsModule
+  ]
+})
+export class SeedModule {}
+
+
+
+- Se inyecta el servicio de prodcutos en el seed service
+
+import { Injectable } from '@nestjs/common';
+import { ProductsService } from 'src/products/products.service';
+
+
+@Injectable()
+export class SeedService {
+
+  constructor(
+    private readonly productsService: ProductsService
+  ){
+
+  }
+
+
+  async runSeed(){
+    return 'Seed Execute'  
+  
+  }
+}
+
+
+- Agregamos el metodo para eliminar todo.
+
+ async runSeed(){
+    await this.productsService.deleteAllProducts();
+    return true;    
+  }
+
+** Insertar de forma masiva
+
+
+- Crear una carpeta llamada data denmtro de la carpeta seed
+
+- Crear un archivo seed-data.ts
+
+- Pegar lo que esta en el repositorioo
+
+
+https://gist.github.com/Klerith/1fb1b9f758bb0c5b2253dfc94f09e1b6#file-seed-ts
+
+- Terminamos la funcion para insertar todos los datos 
+
+
+import { Injectable } from '@nestjs/common';
+import { ProductsService } from 'src/products/products.service';
+import { initialData } from './data/seed-data';
+
+
+@Injectable()
+export class SeedService {
+
+  constructor(
+    private readonly productsService: ProductsService
+  ){
+
+  }
+
+
+  async runSeed(){
+
+
+    // Eliminar todos los datos
+    await this.productsService.deleteAllProducts();
+
+
+    // Insertar los nuevos datos
+    
+    // Obtengo los datos 
+    const products = initialData.products;
+
+
+    // Tendremos un arreglo de promesas
+    const insertPromise = [];
+
+    // Recorremos los productos y lo insertamos
+    products.forEach( product => {
+      insertPromise.push(this.productsService.create(product));
+    });
+
+    // Obtenemos  el arreglo, despues que termine de ejecutarse la promesa
+    await Promise.all(insertPromise);
+
+    return true;    
+  }
+}
+
+
+** Renombrar tablas
+
+Solo es indicar el nombre eb las entidadesg
+
+@Entity({name: 'products'})
+
+
+@Entity({name: 'product-images'})
+
+
+
 
 
 

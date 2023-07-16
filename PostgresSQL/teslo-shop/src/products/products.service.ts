@@ -9,10 +9,11 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { PaginationDto } from 'src/common/dtos/pagination.dto';
 import { validate as isUUID } from 'uuid';
 import { ProductImage, Product } from './entities';
+import { Delete, Query } from '@nestjs/common';
 
 @Injectable()
 export class ProductsService {
@@ -28,6 +29,9 @@ export class ProductsService {
 
     @InjectRepository(ProductImage)
     private readonly productImageRepository: Repository<ProductImage>,
+
+    // Inyectamos el Datasource, que conoce la cadena de conexion
+    private readonly dataSource: DataSource,
   ) {}
 
   async create(createProductDto: CreateProductDto) {
@@ -127,34 +131,78 @@ export class ProductsService {
     return product;
   }
 
-  async findOnePlain(term: string){
-
-    const {images = [], ...rest} = await this.findOne(term);
-     return {
+  async findOnePlain(term: string) {
+    const { images = [], ...rest } = await this.findOne(term);
+    return {
       ...rest,
-      images: images.map(image => image.url)
-     } 
-
+      images: images.map((image) => image.url),
+    };
   }
 
   async update(id: string, updateProductDto: UpdateProductDto) {
+    // Estraer los datos del objeto sin las imagenes, el rest (Que es la data que va a actualizar)
+    const { images, ...toUpdate } = updateProductDto;
+
+    // Hacemos el preload del producto
+    const product = await this.productRepository.preload({
+      id,
+      ...toUpdate,
+    });
+
     // Buscamos el objeto por el ID con el preload y hacemos el spread
     // Al objeto encontrado
-    const product = await this.productRepository.preload({
-      id: id,
-      ...updateProductDto,
-      images: [],
-    });
+    // const product = await this.productRepository.preload({
+    //   id: id,
+    //   ...updateProductDto,
+    //   images: [],
+    // });
 
     if (!product)
       throw new NotFoundException(`Product whit id: ${id} not found`);
 
-    try {
-      // Si encuentra el producto lo actualiza
-      await this.productRepository.save(product);
+    // Crear el Query Runner
+    const queryRunner = this.dataSource.createQueryRunner();
 
-      return product;
+    // Nos conectamos a la base de datos
+    await queryRunner.connect();
+
+    // Iniciamos la transaccion
+    await queryRunner.startTransaction();
+
+    try {
+      // Eliminamos las imagenes anteriores
+      if (images) {
+        // Eliminamos con el query runner, indicamos el id para eliminar
+        await queryRunner.manager.delete(ProductImage, { product: { id } });
+
+        // Guardar las nuevas imagenes, hasta este momento no se a inpactado la base de datos
+        product.images = images.map((image) =>
+          this.productImageRepository.create({ url: image }),
+        );
+      } else {
+        //???????? si no se reciben imagenes, buscamos las imagenes
+        // Esto se hace mejor utilizando
+        product.images = await this.productImageRepository.findBy({product: {id}});
+      }
+
+      //  Guardar el producto, pero aun no se ha echo commits
+      await queryRunner.manager.save(product);
+
+      // Si encuentra el producto lo actualiza
+      //await this.productRepository.save(product);
+
+      // Aca realizamos el commit
+      await queryRunner.commitTransaction();
+      await queryRunner.release();
+
+      return this.findOnePlain(id);
+     // return product;
     } catch (error) {
+
+      //Aca realizamos el rollback de la transaccion
+      await queryRunner.rollbackTransaction();
+      await queryRunner.release();
+
       this.handleDbExceptions(error);
     }
   }
@@ -163,6 +211,26 @@ export class ProductsService {
     const product = await this.findOne(id);
     await this.productRepository.remove(product);
   }
+
+
+async deleteAllProducts(){
+  const query = this.productRepository.createQueryBuilder('product');
+
+  try {
+    
+    return await query
+    .delete()
+    .where({})
+    .execute()
+
+  } catch (error) {
+    this.handleDbExceptions(error);
+    
+  }
+
+
+}
+
 
   private handleDbExceptions(error: any) {
     // Especificamos un error
