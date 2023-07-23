@@ -168,3 +168,560 @@ export class FilesController {
 
 ** Guardar imagen en filesystem
 
+- Crear una carpeta llamada static y una carpeta dentro llamado uploads
+
+- Agrgeamos la configuracion del storage de multer en el end point del controlador
+
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UploadedFile,
+  UseInterceptors,
+  BadRequestException,
+} from '@nestjs/common';
+import { FilesService } from './files.service';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { fileFilter } from './helpers/fileFilter.helper';
+import { diskStorage } from 'multer';
+
+@Controller('files')
+export class FilesController {
+  constructor(private readonly filesService: FilesService) {}
+
+  @Post('product')
+  @UseInterceptors(
+    FileInterceptor(
+      'file',
+
+      {
+        fileFilter: fileFilter,
+        //limits: {fileSize:1000} se puede colocar el tamañp de archivos a cargar
+        storage: diskStorage({
+          destination: './static/uploads'
+        }),
+      },
+    ),
+  ) // Se coloca el nombre de como se recibira el archivo
+  uploadProductImage(@UploadedFile() file: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('Make sure that th files is an image');
+    }
+
+    return {
+      fileName: file.originalname,
+    };
+  }
+}
+
+
+** Renombrar el archivo subido
+
+ - creamos un nuevo helper para files
+
+fileNamer.helper.ts
+
+
+export const fileNamer = (
+  req: Express.Request,
+  file: Express.Multer.File,
+  callback: Function,
+) => {
+  //  console.log({ file });
+
+  if (!file) return callback(new Error('File is empty'), false);
+
+  // Obtenemos la extension del archivo
+  const fileExtension = file.mimetype.split('/')[1];
+
+  const fileName = `HolaMundo.${fileExtension}`
+
+  callback(null, fileName);
+};
+
+
+
+
+- Crear un archivo de barril llamado indeex par que exporte los dos dos helpers
+
+export { fileFilter } from "./fileFilter.helper"
+export { fileNamer } from "./fileNamer.helper"
+
+
+
+-  Los importamos en el controlador
+import { fileNamer, fileFilter } from './helpers';
+
+
+-  Agregamos el filenamer de multer en el diskstorage de multer
+
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UploadedFile,
+  UseInterceptors,
+  BadRequestException,
+} from '@nestjs/common';
+import { FilesService } from './files.service';
+import { FileInterceptor } from '@nestjs/platform-express';
+
+import { diskStorage } from 'multer';
+import { fileNamer, fileFilter } from './helpers';
+
+@Controller('files')
+export class FilesController {
+  constructor(private readonly filesService: FilesService) {}
+
+  @Post('product')
+  @UseInterceptors(
+    FileInterceptor(
+      'file',
+
+      {
+        fileFilter: fileFilter,
+        //limits: {fileSize:1000} se puede colocar el tamañp de archivos a cargar
+        storage: diskStorage({
+          destination: './static/uploads',
+          filename: fileNamer
+        }),
+      },
+    ),
+  ) // Se coloca el nombre de como se recibira el archivo
+  uploadProductImage(@UploadedFile() file: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('Make sure that th files is an image');
+    }
+
+    return {
+      fileName: file.originalname,
+    };
+  }
+}
+
+
+- Instalamos uuid
+
+yarnd add uuid
+
+- Agregamos el uuid en el helper para colocar el nombre del archivo
+
+import {v4 as uuid} from 'uuid'
+
+export const fileNamer = (
+  req: Express.Request,
+  file: Express.Multer.File,
+  callback: Function,
+) => {
+  //  console.log({ file });
+
+  if (!file) return callback(new Error('File is empty'), false);
+
+  // Obtenemos la extension del archivo
+  const fileExtension = file.mimetype.split('/')[1];
+
+  const fileName = `${uuid()}.${fileExtension}`
+
+  callback(null, fileName);
+};
+
+** Servir archivos demanera controlada
+
+- En este paso capturamos el nombre del archivo y lo mostramos
+
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UploadedFile,
+  UseInterceptors,
+  BadRequestException,
+} from '@nestjs/common';
+import { FilesService } from './files.service';
+import { FileInterceptor } from '@nestjs/platform-express';
+
+import { diskStorage } from 'multer';
+import { fileNamer, fileFilter } from './helpers';
+
+@Controller('files')
+export class FilesController {
+  constructor(private readonly filesService: FilesService) {}
+
+  @Post('product')
+  @UseInterceptors(
+    FileInterceptor(
+      'file',
+
+      {
+        fileFilter: fileFilter,
+        //limits: {fileSize:1000} se puede colocar el tamañp de archivos a cargar
+        storage: diskStorage({
+          destination: './static/uploads',
+          filename: fileNamer
+        }),
+      },
+    ),
+  ) // Se coloca el nombre de como se recibira el archivo
+  uploadProductImage(@UploadedFile() file: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('Make sure that th files is an image');
+    }
+
+    // Almacenamos el nombre del archivo
+    const secureUrl = `${file.filename}`
+
+    return {
+     // fileName: file.originalname,
+      
+    // retornamos el nombre 
+     secureUrl
+   
+    };
+  }
+}
+
+
+- Crear un endpoint en el controlador para obtener el nombre del archivo
+
+
+  @Get('product/:imageName')
+  findProductImage(@Param('imageName') imageName: string) {
+    return imageName;
+  }
+
+
+- Creamos una funcion en el servicio que consulte el patch del archivo y valide si existe
+
+import { BadGatewayException, Injectable } from '@nestjs/common';
+import { existsSync } from 'fs';
+import { join } from 'path';
+
+@Injectable()
+export class FilesService {
+  getStaticProductImage(imageName: string) {
+    const path = join(__dirname, '../../static/uploads', imageName);
+
+    if (!existsSync(path))
+      throw new BadGatewayException(`No product found whit image ${imageName}`);
+
+    return path;
+  }
+}
+
+
+- Utilizamos la funcion del srvicio para obtrener la URL en donde esta el archivo
+
+  @Get('product/:imageName')
+  findProductImage(@Param('imageName') imageName: string) {
+    const path = this.filesService.getStaticProductImage(imageName)
+    return path;
+  }
+
+- Importamos el Response de expres y colocamos el decorador Res, para elegir manualmente mi respues
+
+import { Response } from 'express';
+
+
+
+  @Get('product/:imageName')
+  findProductImage(
+    
+    @Res() res: Response,
+    @Param('imageName') imageName: string) {
+    const path = this.filesService.getStaticProductImage(imageName)
+    return path;
+  }
+
+
+- Enviamos la respuesta con el res, n este momento NEst no controla la respuesta
+
+
+  @Get('product/:imageName')
+  findProductImage(
+    @Res() res: Response,
+    @Param('imageName') imageName: string,
+  ) {
+    const path = this.filesService.getStaticProductImage(imageName);
+
+    res.status(403).json({
+      ok: false,
+      path: path
+    })
+
+    return path;
+  }
+
+- Ahora si, enviamos el archivo
+
+  @Get('product/:imageName')
+  findProductImage(
+    @Res() res: Response,
+    @Param('imageName') imageName: string,
+  ) {
+    const path = this.filesService.getStaticProductImage(imageName);
+
+    // res.status(403).json({
+    //   ok: false,
+    //   path: path
+    // })
+
+    res.sendFile(path);
+
+    return path;
+  }
+
+** Retornar secureUrl
+
+- Agregamos estas variables en el .env
+
+HOST_API=http://localhost:3000/api
+PORT=3000
+
+
+- Lo agregamos en el .env.template
+
+.env.template
+
+- Inyectamos el config service
+
+
+@Controller('files')
+export class FilesController {
+  constructor(
+    private readonly filesService: FilesService,
+    private readonly configService: ConfigService) {}
+
+
+-  Importamos el ConfigService en el modulo de file
+
+import { Module } from '@nestjs/common';
+import { FilesService } from './files.service';
+import { FilesController } from './files.controller';
+import { ConfigModule } from '@nestjs/config';
+
+
+@Module({
+  controllers: [FilesController],
+  providers: [FilesService],
+  imports:[ConfigModule]
+})
+export class FilesModule {}
+
+
+-  Agregamos el path en el controlador para que se  guarde en la base de datos 
+
+
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UploadedFile,
+  UseInterceptors,
+  BadRequestException,
+  Res,
+} from '@nestjs/common';
+import { FilesService } from './files.service';
+import { FileInterceptor } from '@nestjs/platform-express';
+
+import { diskStorage } from 'multer';
+import { fileNamer, fileFilter } from './helpers';
+import { Response } from 'express';
+import { ConfigService } from '@nestjs/config';
+
+@Controller('files')
+export class FilesController {
+  constructor(
+    private readonly filesService: FilesService,
+    private readonly configService: ConfigService) {}
+
+  @Get('product/:imageName')
+  findProductImage(
+    @Res() res: Response,
+    @Param('imageName') imageName: string,
+  ) {
+    const path = this.filesService.getStaticProductImage(imageName);
+
+    // res.status(403).json({
+    //   ok: false,
+    //   path: path
+    // })
+
+    res.sendFile(path);
+
+    return path;
+  }
+
+  @Post('product')
+  @UseInterceptors(
+    FileInterceptor(
+      'file',
+
+      {
+        fileFilter: fileFilter,
+        //limits: {fileSize:1000} se puede colocar el tamañp de archivos a cargar
+        storage: diskStorage({
+          destination: './static/uploads',
+          filename: fileNamer,
+        }),
+      },
+    ),
+  ) // Se coloca el nombre de como se recibira el archivo
+  uploadProductImage(@UploadedFile() file: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('Make sure that th files is an image');
+    }
+
+    // Almacenamos el nombre del archivo
+    //const secureUrl = `${file.filename}`;
+    const secureUrl = `${this.configService.get('HOST_API')}/files/product/${file.filename}`;
+
+    return {
+      // fileName: file.originalname,
+
+      // retornamos el nombre
+      secureUrl,
+    };
+  }
+}
+
+
+Al hacer el post, se puede ver que se retorna la URl
+
+{
+	"secureUrl": "http://localhost:3000/api/files/product/d4ec3aa9-781a-4779-8bb4-b2f15afe4b7b.jpeg"
+}
+
+
+-- Solo para corregir, agregamos el puerto con la variable global en el main
+
+
+
+-   Cambiamos el console log por el logger
+
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from './app.module';
+import { Logger, ValidationPipe } from '@nestjs/common';
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+  const logger = new Logger('Bootstrap');
+
+  app.setGlobalPrefix('api');
+
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    }),
+  );
+
+  await app.listen(process.env.PORT);
+  logger.log(`App running on port ${process.env.PORT}`);
+}
+bootstrap();
+
+
+
+** Otra forma de desplegar los archivos
+
+- Descargar el ZIP para obtener todas las imagenes, que hacen match con la informacion grabada en la base de datos
+
+- Crear una carpeta llamada public en la raiz del proyecto
+
+- Guardar la carpeta con las imagenes desargadas alli
+
+- Instalar el serve-static
+
+yarn add @nestjs/serve-static
+
+- Lo importamos en el app module
+
+import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { ProductsModule } from './products/products.module';
+import { CommonModule } from './common/common.module';
+import { SeedModule } from './seed/seed.module';
+import { FilesModule } from './files/files.module';
+import { ServeStaticModule } from '@nestjs/serve-static';
+import { join } from 'path';
+
+@Module({
+  imports: [
+    
+    ConfigModule.forRoot(),
+    
+    TypeOrmModule.forRoot({
+      type: 'postgres',
+      host: process.env.DB_HOST,
+      port: +process.env.DB_PORT,
+      database: process.env.DB_NAME,
+      username: process.env.DB_USERNAME,
+      password: process.env.DB_PASSWORD,
+      autoLoadEntities: true,
+      synchronize: true
+
+    }),
+    
+    ProductsModule,
+    
+    CommonModule,
+    
+    SeedModule,
+    
+    FilesModule,
+  
+    ServeStaticModule.forRoot({
+      rootPath: join(__dirname, '..', 'public'),
+    }),
+  
+  ],
+})
+export class AppModule {}
+
+-- Al utilizar la url se puede mostrar las imagenes desde el navegador
+
+http://localhost:3000/products/1473809-00-A_1_2000.jpg
+
+NO SE RECOMIENDA PORQUE NO SE PODRA CONTROLAR, ES DECIR, SERA PUBLICO SIN VALIDACIONES
+
+-- En este caso deberiamos actualizar la url de las imagenes en la base de datos para que queden
+con el local host etc
+
+select url , 'http://localhost:3000/products/' || url from "product-images"
+
+
+update  "product-images" set url = 'http://localhost:3000/products/' || url 
+
+- DE ESTA MANERA QUEDARIA REPETIDO EL LOCALHOST EN TODAS LAS URLS DE LA BSE DE DATOS, 
+PERO VAMOS A CORREGIR
+
+** Colocar imagenes en el directorio estatico
+
+- Pasamos las imagenes de la carpeta public al static
+
+- Ejecutamos el seed para actualizar la url de las imagenes como estaba antes
+
+- Ahora si podriamos reutilizar este endpoint para ver las imagenes
+
+http://localhost:3000/api/files/product/1740176-00-A_0_2000.jpg
+
+De esta manera podriamos controlar quien puede ver las imagenes y quien no.
+
+
