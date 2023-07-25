@@ -1,0 +1,220 @@
+** Crear la entidad de usuario
+
+
+- Crear un nuevo recurso
+
+nest g res auth --no-spec
+
+
+- Creamos la entidad
+
+import { Entity, PrimaryGeneratedColumn } from 'typeorm';
+
+@Entity()
+export class User {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  email: string;
+
+  pasword: string;
+
+  fullName: string;
+
+  isActive: boolean;
+
+  roles: string[];
+}
+
+- Importamos la entidad en el modulo para que se cree la tabla
+
+import { Module } from '@nestjs/common';
+import { AuthService } from './auth.service';
+import { AuthController } from './auth.controller';
+import { User } from './entities/user.entity';
+import { TypeOrmModule } from '@nestjs/typeorm';
+
+
+@Module({
+  controllers: [AuthController],
+  providers: [AuthService],
+  imports:[
+    TypeOrmModule.forFeature([User])
+  ],
+  exports:[
+    TypeOrmModule
+  ]
+})
+export class AuthModule {}
+
+
+- Terminamos de configurar las demas columnas de la entidad
+
+import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+
+@Entity()
+export class User {
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column('text', {
+    unique: true,
+  })
+  email: string;
+
+  @Column('text')
+  password: string;
+
+  @Column('text')
+  fullName: string;
+
+  @Column('bool', {
+    default: true,
+  })
+  isActive: boolean;
+
+  @Column('text', {
+    array: true,
+    default: ['user'],
+  })
+  roles: string[];
+}
+
+
+
+** Crear usuario
+
+- Crear el DTO para el usuario
+
+create-user.dto.ts
+
+
+
+Expression regular para la contraseña
+https://gist.github.com/Klerith/c77edd9d86174aa68efbfddd21f053a2
+
+
+import {
+  IsEmail,
+  IsString,
+  Matches,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
+
+export class CreateUserDto {
+  @IsString()
+  @IsEmail()
+  email: string;
+
+  // Agregar expresion regular para la contraseña
+  @IsString()
+  @MinLength(6)
+  @MaxLength(50)
+  @Matches(/(?:(?=.*\d)|(?=.*\W+))(?![.\n])(?=.*[A-Z])(?=.*[a-z]).*$/, {
+    message:
+      'The password must have a Uppercase, lowercase letter and a number',
+  })
+  password: string;
+
+  @IsString()
+  @MinLength(1)
+  fullName: string;
+}
+
+
+
+- Importamos el DTO en el controlador para crear el usuario
+
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+} from '@nestjs/common';
+import { AuthService } from './auth.service';
+import { CreateUserDto } from './dto/create-user.dto';
+
+@Controller('auth')
+export class AuthController {
+  constructor(private readonly authService: AuthService) {}
+
+  @Post('register')
+  create(@Body() createAuthDto: CreateUserDto) {
+    return this.authService.create(createAuthDto);
+  }
+}
+
+
+- Agregamos la funcion en el servicio
+
+import { Injectable } from '@nestjs/common';
+import { CreateUserDto } from './dto/create-user.dto';
+
+
+@Injectable()
+export class AuthService {
+  create(createAuthDto: CreateUserDto) {
+    return 'This action adds a new auth';
+  }
+
+ 
+}
+
+
+Probar en Insomnia, sin body para identificar que si esta validando el dto y con
+body para ver que se ejecuta la funcion
+
+{
+	"email":"gbetin@music.com",
+	"password": "Abc123",
+	"fullName": "Gabriel Betin"
+}
+
+
+- Vamos a crear el usuario desde el servicio y creamos la funcion para el error
+
+import {
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+} from '@nestjs/common';
+import { CreateUserDto } from './dto/create-user.dto';
+import { Repository } from 'typeorm';
+import { User } from './entities/user.entity';
+import { InjectRepository } from '@nestjs/typeorm';
+
+@Injectable()
+export class AuthService {
+  constructor(
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+  ) {}
+
+  async create(createAuthDto: CreateUserDto) {
+    try {
+      const user = this.userRepository.create(createAuthDto);
+      await this.userRepository.save(user);
+      return user;
+    } catch (error) {
+      this.handleDBErrors(error);
+    }
+  }
+
+  private handleDBErrors(error: any) {
+    if (error.code === '23505') throw new BadRequestException(error.detail);
+
+    console.log(error);
+
+    throw new InternalServerErrorException('Please check server logs');
+  }
+}
+
+
+** 
+
+
+
