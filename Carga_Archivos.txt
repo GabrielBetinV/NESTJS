@@ -725,3 +725,320 @@ http://localhost:3000/api/files/product/1740176-00-A_0_2000.jpg
 De esta manera podriamos controlar quien puede ver las imagenes y quien no.
 
 
+** Encriptar la contrasela con el hash de una sola via, no se puede desencriptar
+
+- Instalar bcryp
+
+yarn add bcrypt
+
+yarn add -D @types/bcrypt
+
+- Importamos el bcrypt y lo utilzamos al momento de guardar la contraseña
+
+import {
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+} from '@nestjs/common';
+import { CreateUserDto } from './dto/create-user.dto';
+import { Repository } from 'typeorm';
+import { User } from './entities/user.entity';
+import { InjectRepository } from '@nestjs/typeorm';
+import * as bcrypt from 'bcrypt';
+
+@Injectable()
+export class AuthService {
+  constructor(
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+  ) {}
+
+  async create(createAuthDto: CreateUserDto) {
+    try {
+      /// Destructuramos el objeto para separar  la contraseña
+      const { password, ...userData } = createAuthDto;
+
+      // Utilizamos el hasSync
+      const user = this.userRepository.create({
+        ...userData,
+        password: bcrypt.hashSync(password, 10),
+      });
+      await this.userRepository.save(user);
+      
+      // Eliminamos la propiedad de password del objeto para no mostrarla
+      delete user.password;
+
+      return user;
+    } catch (error) {
+      this.handleDBErrors(error);
+    }
+  }
+
+  private handleDBErrors(error: any) {
+    if (error.code === '23505') throw new BadRequestException(error.detail);
+
+    console.log(error);
+
+    throw new InternalServerErrorException('Please check server logs');
+  }
+}
+
+
+** Login de usuario
+
+- Creamos un dto para el login
+
+import {
+    IsEmail,
+    IsString,
+    Matches,
+    MaxLength,
+    MinLength,
+  } from 'class-validator';
+  
+  export class LoginUserDto {
+    @IsString()
+    @IsEmail()
+    email: string;
+  
+    // Agregar expresion regular para la contraseña
+    @IsString()
+    @MinLength(6)
+    @MaxLength(50)
+    @Matches(/(?:(?=.*\d)|(?=.*\W+))(?![.\n])(?=.*[A-Z])(?=.*[a-z]).*$/, {
+      message:
+        'The password must have a Uppercase, lowercase letter and a number',
+    })
+    password: string;
+  
+ 
+  }
+  
+
+- Creamos un archivo de barril para exportar los dto
+
+index.ts
+
+export { CreateUserDto } from './create-user.dto';
+export { LoginUserDto } from './login-user.dto';
+
+Cambiamos la importacion en donde lo utilicemos
+
+import { CreateUserDto ,LoginUserDto} from './dto/index';
+
+- Creamos un endpoint en el controlador que envie el dto al servicio
+
+
+  @Post('login')
+  loginUser(@Body() loginUserDto: LoginUserDto) {
+    return this.authService.login(loginUserDto);
+  }
+
+hay que crear la funccion login en el servicio
+
+-  Funcion para buscar el usuario con el login
+
+  async login(loginUserDto: LoginUserDto) {
+
+    //Destrucutrar el objeto que recibimos
+    const { password, email } = loginUserDto;
+
+    // Consultar el usuario que encuentre con el email
+    const user = await this.userRepository.findOneBy({ email });
+
+    // try {
+
+    // } catch (error) {
+    //   this.handleDBErrors(error)
+    // }
+
+    //Retornar el usuario
+    return user;
+  }
+
+
+- Para que no se vea la contraseña, vamos a la entidad 
+y colocamos el select en false
+
+ @Column('text',{
+    select: false
+  })
+  password: string;
+
+- HAy otra manera de buscar el usuario, y que nos retorne 
+solo el email y contraseña
+
+  async login(loginUserDto: LoginUserDto) {
+
+    //Destrucutrar el objeto que recibimos
+    const { password, email } = loginUserDto;
+
+    // Consultar el usuario que encuentre con el email
+   
+   // const user = await this.userRepository.findOneBy({ email });
+
+    // otra manera de consultar
+    const user = await this.userRepository.findOne({
+      where: {email},
+      select: {email: true, password:true}
+
+       });
+
+
+    // try {
+
+    // } catch (error) {
+    //   this.handleDBErrors(error)
+    // }
+
+    //Retornar el usuario
+    return user;
+  }
+
+- Podemos agregar un mensaje de error para cuando
+no se encuentre el usuario con el email
+
+
+  async login(loginUserDto: LoginUserDto) {
+
+    //Destrucutrar el objeto que recibimos
+    const { password, email } = loginUserDto;
+
+    // Consultar el usuario que encuentre con el email
+   
+   // const user = await this.userRepository.findOneBy({ email });
+
+    // otra manera de consultar
+    const user = await this.userRepository.findOne({
+      where: {email},
+      select: {email: true, password:true}
+
+       });
+
+
+       if(!user)
+        throw new UnauthorizedException('Credentials are not valid (email)');
+
+
+    // try {
+
+    // } catch (error) {
+    //   this.handleDBErrors(error)
+    // }
+
+    //Retornar el usuario
+    return user;
+  }
+
+-Si el usuario existe, comparamos la contraseña
+
+  async login(loginUserDto: LoginUserDto) {
+    //Destrucutrar el objeto que recibimos
+    const { password, email } = loginUserDto;
+
+    // Consultar el usuario que encuentre con el email
+
+    // const user = await this.userRepository.findOneBy({ email });
+
+    // otra manera de consultar
+    const user = await this.userRepository.findOne({
+      where: { email },
+      select: { email: true, password: true },
+    });
+
+    // Validar el email
+    if (!user)
+      throw new UnauthorizedException('Credentials are not valid (email)');
+
+    // Validar la contraseña
+    if (!bcrypt.compareSync(password, user.password))
+      throw new UnauthorizedException('Credentials are not valid (password)');
+    // try {
+
+    // } catch (error) {
+    //   this.handleDBErrors(error)
+    // }
+
+    //Retornar el usuario
+    return user;
+  }
+
+
+** Nest Authentication  - Passport
+
+https://docs.nestjs.com/security/authentication
+
+- Instalar passport de nest
+
+yarn add @nestjs/passport passport
+
+
+- Instalar jwt
+
+yarn add @nestjs/jwt passport-jwt
+
+yarn add -D @types/passport-jwt
+
+
+- Crear estrategia para autenticarse, agregamos esto en el modulo de auth
+
+Crear variable de entorno para la variable de entorno
+
+HOST_API=http://localhost:3000/api
+PORT=3000
+JWT_SECRET=Est3EsMISE3Dsecreto321
+
+DB_HOST=localhost
+DB_PORT = 5432
+DB_USERNAME=postgres
+DB_PASSWORD=MySecr3etPassword@as2
+DB_NAME=TesloDB
+
+configurar el modulo de auth
+
+
+import { Module } from '@nestjs/common';
+import { AuthService } from './auth.service';
+import { AuthController } from './auth.controller';
+import { User } from './entities/user.entity';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { PassportModule } from '@nestjs/passport';
+import { JwtModule } from '@nestjs/jwt';
+
+
+@Module({
+  controllers: [AuthController],
+  providers: [AuthService],
+  imports:[
+    TypeOrmModule.forFeature([User]),
+
+    PassportModule.register({ defaultStrategy: 'jwt'}),
+
+    JwtModule.register({
+      secret: process.env.JWT_SECRET,
+      signOptions: {
+        expiresIn: '2h'
+      }
+
+    })
+  ],
+  exports:[
+    TypeOrmModule
+  ]
+})
+export class AuthModule {}
+
+
+NOTA => La configuracion del modulo de JWT es mejor realizarla de manera asybcrina, para
+asegurarnos que la variable de entorno si exista o tenga unvalor
+
+
+
+** Modulos Asyncronos
+
+
+
+
+
+
+
