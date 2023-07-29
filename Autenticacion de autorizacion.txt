@@ -722,5 +722,429 @@ http://localhost:3000/api/auth/private
 
 eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImdiZXRpbkBtdXNpY3MuY29tIiwiaWF0IjoxNjkwNDE5OTk0LCJleHAiOjE2OTA0MjcxOTR9.DApRY-NgYCPbgiGv2VdpEzc5y92SGCavr5glMgmmnzI
 
+** Cambiar email por id
+
+- Cambiar el nombre en la interface
+
+
+
+export interface JwtPayload {
+
+    id:string;
+
+    // TODO: añadir todo lo que tengamos
+
+}
+
+- Cambiar el parametro a enviar en el servicio de auth 
+
+  token: this.getJwtToken({id: user.id})
+
+- Cambiarlo en la estrategia
+
+import { PassportStrategy } from "@nestjs/passport";
+import { ExtractJwt, Strategy } from "passport-jwt";
+import { User } from "../entities/user.entity";
+import { JwtPayload } from "../interfaces/jwt-payload.interface";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { ConfigService } from "@nestjs/config";
+import { Injectable, UnauthorizedException } from "@nestjs/common";
+
+@Injectable()
+export class JwtStrategy extends PassportStrategy(Strategy){
+
+//Inyectamos el patron repositorio de usuario y el configService para obtener variables de entorno
+ constructor(
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+    configService: ConfigService    
+ ){
+    super({
+        secretOrKey:  configService.get('JWT_SECRET'),
+        jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(), // Esta es la autenticacion que escogeremos en postman etc
+    })
+ }
+
+
+
+   // Este metodo nos ayudara a validar si el usuario existe
+   async validate(payload: JwtPayload): Promise<User>{
+
+    // Destructuramos el payload
+    const {id} = payload; 
+
+    /// Buscamos el usuario por el email
+    const user = await this.userRepository.findOneBy({id});
+
+
+    // Validamos si el usuario existe
+    if (!user)
+        throw new UnauthorizedException('Token not valid');
+
+    // Validamos si esta activo    
+    if (!user.isActive)
+        throw new UnauthorizedException('User is inactive, talk with an admin');
+
+
+    //Retornamos el usuario
+    return user;
+
+   }
+
+
+
+}
+
+- Agregar en el where el id
+
+  async login(loginUserDto: LoginUserDto) {
+    //Destrucutrar el objeto que recibimos
+    const { password, email } = loginUserDto;
+
+    // Consultar el usuario que encuentre con el email
+
+    // const user = await this.userRepository.findOneBy({ email });
+
+    // otra manera de consultar
+    const user = await this.userRepository.findOne({
+      where: { email },
+      select: { email: true, password: true, id:true },
+    });
+
+    // Validar el email
+    if (!user)
+      throw new UnauthorizedException('Credentials are not valid (email)');
+
+    // Validar la contraseña
+    if (!bcrypt.compareSync(password, user.password))
+      throw new UnauthorizedException('Credentials are not valid (password)');
+    // try {
+
+    // } catch (error) {
+    //   this.handleDBErrors(error)
+    // }
+
+    //Retornar el usuario
+    return {
+      ...user,
+      token: this.getJwtToken({id: user.id})
+  };
+  }
+
+** Custom Property Decorator
+
+- De esta manera podriamos obtener el usuario de la request
+
+ @Get('private')
+  @UseGuards(AuthGuard())
+  testingPrivateRoute(
+    @Req() request :Express.Request
+  ){
+
+    console.log({user: request.user})
+    return {
+      ok: true,
+      message: 'Hola Mundo'
+    }
+  }
+
+- Pero mejor lo obtenenemos realizando un decorador personalizado
+
+Creamos una carpeta llamada decorators dentro de auth
+
+Dentro de la carpeta, este archivo => get-user.decorator.ts
+
+import { ExecutionContext, InternalServerErrorException, createParamDecorator } from "@nestjs/common";
+
+
+
+export const GetUser = createParamDecorator(
+    (data, ctx: ExecutionContext) => {
+     
+        // Obtenemos la reques desde el contexto
+        const req = ctx.switchToHttp().getRequest();
+        
+        // Almacenamos el usuario enun a variable
+        const user = req.user;
+
+        if(!user)
+            throw new InternalServerErrorException('User not found (request)');
+
+        return user
+    }
+
+);
+
+- Agregamos el decorador en el controlador
+
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  Req,
+} from '@nestjs/common';
+import { AuthService } from './auth.service';
+import { CreateUserDto ,LoginUserDto} from './dto/index';
+import { AuthGuard } from '@nestjs/passport';
+import * as request from 'supertest';
+import { GetUser } from './decorators/get-user.decorator';
+import { User } from './entities/user.entity';
+
+@Controller('auth')
+export class AuthController {
+  constructor(private readonly authService: AuthService) {}
+
+  @Post('register')
+  create(@Body() createAuthDto: CreateUserDto) {
+    return this.authService.create(createAuthDto);
+  }
+
+
+  @Post('login')
+  loginUser(@Body() loginUserDto: LoginUserDto) {
+    return this.authService.login(loginUserDto);
+  }
+
+
+  @Get('private')
+  @UseGuards(AuthGuard())
+  testingPrivateRoute(
+    //@Req() request :Express.Request
+
+    // Obtenedremos el usuario
+    @GetUser() user: User
+    ){
+
+   // console.log({user: request.user})
+    return {
+      ok: true,
+      user
+    }
+  }
+
+}
+
+
+** Utilizar de dos maneras el decorador
+
+- Lo agregamos en el controlador
+
+ @Get('private')
+  @UseGuards(AuthGuard())
+  testingPrivateRoute(
+    //@Req() request :Express.Request
+
+    // Obtenedremos el usuario
+    @GetUser() user: User,
+    @GetUser('email') userEmail: string
+    ){
+
+   // console.log({user: request.user})
+    return {
+      ok: true,
+      user,
+
+      userEmail
+    }
+  }
+
+- Regresamos  con un operador ternario el usuario , ya sea con data o sin data
+
+import { ExecutionContext, InternalServerErrorException, createParamDecorator } from "@nestjs/common";
+
+
+
+export const GetUser = createParamDecorator(
+    (data: string, ctx: ExecutionContext) => {
+     
+        // Obtenemos la reques desde el contexto
+        const req = ctx.switchToHttp().getRequest();
+        
+        // Almacenamos el usuario enun a variable
+        const user = req.user;
+
+        if(!user)
+            throw new InternalServerErrorException('User not found (request)');
+
+        // Agregamos un ternario para que si tiene data retorne el arreglo de objetos    
+        return (!data)
+              ? user
+              : user[data]
+    }
+
+);
+
+
+- Crear otro custom decorator que muestre los headers recibido
+
+Crear el archivo raw-headers.decorator.ts
+
+import { ExecutionContext, InternalServerErrorException, createParamDecorator } from "@nestjs/common";
+
+
+
+export const RawHeaders = createParamDecorator(
+    (data: string, ctx: ExecutionContext) => {
+     
+        // Obtenemos la reques desde el contexto
+        const req = ctx.switchToHttp().getRequest();
+        
+       
+        return req.rawHeaders;
+    }
+
+);
+
+- creamos un archivo de barril para exportar los dos decoradores
+
+index.ts
+
+export { GetUser } from "./get-user.decorator";
+export { RawHeaders } from "./raw-headers.decorator";
+
+
+- Cambiamos la importacion en el controlador
+
+import { GetUser,RawHeaders } from './decorators';
+
+- Agregamos el nuevo dcorador en la ruta del controlador
+
+
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  Req,
+} from '@nestjs/common';
+import { AuthService } from './auth.service';
+import { CreateUserDto ,LoginUserDto} from './dto/index';
+import { AuthGuard } from '@nestjs/passport';
+import * as request from 'supertest';
+import { GetUser,RawHeaders } from './decorators';
+import { User } from './entities/user.entity';
+
+@Controller('auth')
+export class AuthController {
+  constructor(private readonly authService: AuthService) {}
+
+  @Post('register')
+  create(@Body() createAuthDto: CreateUserDto) {
+    return this.authService.create(createAuthDto);
+  }
+
+
+  @Post('login')
+  loginUser(@Body() loginUserDto: LoginUserDto) {
+    return this.authService.login(loginUserDto);
+  }
+
+
+  @Get('private')
+  @UseGuards(AuthGuard())
+  testingPrivateRoute(
+    //@Req() request :Express.Request
+
+    // Obtenedremos el usuario
+    @GetUser() user: User,
+    @GetUser('email') userEmail: string,
+    @RawHeaders() rawHeaders: string[]
+    ){
+
+   // console.log({user: request.user})
+    return {
+      ok: true,
+      user,
+      userEmail,
+      rawHeaders
+
+    }
+  }
+
+}
+
+
+-De todas maneras ya existe un decorador que trae los headers
+
+@Headers
+
+
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  Req,
+  Headers,
+} from '@nestjs/common';
+import { AuthService } from './auth.service';
+import { CreateUserDto ,LoginUserDto} from './dto/index';
+import { AuthGuard } from '@nestjs/passport';
+import * as request from 'supertest';
+import { GetUser,RawHeaders } from './decorators';
+import { User } from './entities/user.entity';
+import { IncomingHttpHeaders } from 'http';
+
+@Controller('auth')
+export class AuthController {
+  constructor(private readonly authService: AuthService) {}
+
+  @Post('register')
+  create(@Body() createAuthDto: CreateUserDto) {
+    return this.authService.create(createAuthDto);
+  }
+
+
+  @Post('login')
+  loginUser(@Body() loginUserDto: LoginUserDto) {
+    return this.authService.login(loginUserDto);
+  }
+
+
+  @Get('private')
+  @UseGuards(AuthGuard())
+  testingPrivateRoute(
+    //@Req() request :Express.Request
+
+    // Obtenedremos el usuario
+    @GetUser() user: User,
+    @GetUser('email') userEmail: string,
+    @RawHeaders() rawHeaders: string[],
+    @Headers() headers: IncomingHttpHeaders
+    ){
+
+   // console.log({user: request.user})
+    return {
+      ok: true,
+      user,
+      userEmail,
+      rawHeaders,
+      headers
+
+    }
+  }
+
+}
+
+
+
+** Custom Guard y Custom Decorator
+
+ 
+
 
 
