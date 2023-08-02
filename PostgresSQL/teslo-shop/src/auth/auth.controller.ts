@@ -9,14 +9,19 @@ import {
   UseGuards,
   Req,
   Headers,
+  SetMetadata,
 } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { CreateUserDto ,LoginUserDto} from './dto/index';
 import { AuthGuard } from '@nestjs/passport';
 import * as request from 'supertest';
-import { GetUser,RawHeaders } from './decorators';
+import { Auth, GetUser,RawHeaders } from './decorators';
 import { User } from './entities/user.entity';
 import { IncomingHttpHeaders } from 'http';
+import { UserRolesGuard } from './guards/user-roles/user-roles.guard';
+import { Roleprotected } from './decorators/roleprotected.decorator';
+import { validate } from 'uuid';
+import { ValidRoles } from './interfaces';
 
 @Controller('auth')
 export class AuthController {
@@ -46,6 +51,10 @@ export class AuthController {
     @Headers() headers: IncomingHttpHeaders
     ){
 
+
+
+
+
    // console.log({user: request.user})
     return {
       ok: true,
@@ -55,6 +64,42 @@ export class AuthController {
       headers
 
     }
+  }
+
+
+  @Get('private2')
+  //@SetMetadata('roles', ['admin','super-user','']) // En esta metada tenemos un arreglo de roles
+  @Roleprotected(ValidRoles.superUser, ValidRoles.admin)
+  @UseGuards(AuthGuard(), UserRolesGuard)
+  privateRoute2(
+    
+    @GetUser() user: User
+  ){
+
+    return {
+      ok: true,
+      user
+    }
+
+  }
+
+
+
+  @Get('private3')
+  //@SetMetadata('roles', ['admin','super-user','']) // En esta metada tenemos un arreglo de roles
+  //@Roleprotected(ValidRoles.superUser, ValidRoles.admin)
+  //@UseGuards(AuthGuard(), UserRolesGuard)
+  @Auth(ValidRoles.admin,ValidRoles.superUser)
+  privateRoute3(
+    
+    @GetUser() user: User
+  ){
+
+    return {
+      ok: true,
+      user
+    }
+
   }
 
 }

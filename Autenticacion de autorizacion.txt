@@ -1144,7 +1144,405 @@ export class AuthController {
 
 ** Custom Guard y Custom Decorator
 
+ - Crear un nuevo end POint para obtener el usuario
+
+  @Get('private2')
+  @UseGuards(AuthGuard())
+  privateRoute2(
+    
+    @GetUser() user: User
+  ){
+
+    return {
+      ok: true,
+      user
+    }
+
+  }
+
+
+
+- Agregamos una metadata
+
+
+  @Get('private2')
+  @SetMetadata('roles', ['admin','super-user','']) // En esta metada tenemos un arreglo de roles
+  @UseGuards(AuthGuard())
+  privateRoute2(
+    
+    @GetUser() user: User
+  ){
+
+    return {
+      ok: true,
+      user
+    }
+
+  }
+
+- Creamos un guard pra validar los roles
+
+nest g gu auth/guards/userRoles --no-spec
+
+import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
+import { Observable } from 'rxjs';
+
+@Injectable()
+export class UserRolesGuard implements CanActivate {
+  canActivate(
+    context: ExecutionContext,
+  ): boolean | Promise<boolean> | Observable<boolean> {
+
+
+    console.log('UserRoleGuard')
+
+    return true;
+  }
+}
+
+- probar el guards
+
+
+  @Get('private2')
+  @SetMetadata('roles', ['admin','super-user','']) // En esta metada tenemos un arreglo de roles
+  @UseGuards(AuthGuard(), UserRolesGuard)
+  privateRoute2(
+    
+    @GetUser() user: User
+  ){
+
+    return {
+      ok: true,
+      user
+    }
+
+  }
+
+}
+
+- Agregamos al guards un reflector para obtener los datos de la metada
+
+
+import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
+import { Observable } from 'rxjs';
+
+@Injectable()
+export class UserRolesGuard implements CanActivate {
+
+  constructor(
+    // ME ayuda a aver iformacion de los decoradores y metadada
+    private readonly reflector: Reflector
+  ){
+
+  }
+
+
+  canActivate(
+    context: ExecutionContext,
+  ): boolean | Promise<boolean> | Observable<boolean> {
+
+
+    //console.log('UserRoleGuard')
+
+
+    // Obtenemos el arreglo de roles del metadata
+    const validRoles: string[] = this.reflector.get('roles', context.getHandler())
+
+    console.log(validRoles)
+
+    return true;
+  }
+}
+
+** Verificar el rol del usuario
+
+Agregamos estas validaciones para que elk guards valide 
+
+import {
+  BadRequestException,
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+  Injectable,
+} from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
+import { Observable } from 'rxjs';
+import { User } from 'src/auth/entities/user.entity';
+
+@Injectable()
+export class UserRolesGuard implements CanActivate {
+  constructor(
+    // ME ayuda a aver iformacion de los decoradores y metadada
+    private readonly reflector: Reflector,
+  ) {}
+
+  canActivate(
+    context: ExecutionContext,
+  ): boolean | Promise<boolean> | Observable<boolean> {
+    //console.log('UserRoleGuard')
+
+    // Obtenemos el arreglo de roles del metadata
+    const validRoles: string[] = this.reflector.get(
+      'roles',
+      context.getHandler(),
+    );
+
+    // Obtenemos el usuario
+    const req = context.switchToHttp().getRequest();
+    const user = req.user as User;
+
+    // Validamos si el usuario no exista
+    if (!user) throw new BadRequestException('User not found');
+
+    // asi obtenemos el rol del usuario
+    console.log({ userRoles: user.roles });
+
+    //console.log(validRoles)
+
+    // Recorremos el arreglo de usuario
+    for (const role of user.roles) {
+      // Si al menos hay un role dentro del arreglo retornamos true
+      if (validRoles.includes(role)) {
+        return true;
+      }
+    }
+
+    // Si no esta en el arreglo retornamos la exception, informando 
+    // los tipos de usuarios que debe tener
+    throw new ForbiddenException(
+      `User ${user.fullName} need a valid role: [${validRoles}]`
+    )
+
+    //return true;
+  }
+}
+
+- Agregamos una validacion para el caso en el que no se ennvie roles en el metada,
+se dejhe pasar
+
+  // Si  no hay metadata de arreglos, se retorna true  
+    if(!validRoles) return true;
+    if(validRoles.length === 0) return true;
+
+
+** Custom Decorator
+
+- Crear un un decorator llamado  roleProtected
+
+nest g d auth/decorators/roleprotected --no-spec
+
+import { SetMetadata } from '@nestjs/common';
+
+export const Roleprotected = (...args: string[]) => SetMetadata('roleprotected', args);
+
+
+-   Agregamos una constante que se llame META_ROLES, para almacenar el 
+string de la metadata y asi nos facilita cambiar en un solo lado
+
+import { SetMetadata } from '@nestjs/common';
+
+export const META_ROLES = 'roles';
+
+
+export const Roleprotected = (...args: string[]) => {
+
+return SetMetadata(META_ROLES, args);
+
+};
+
+
+- Agregamos la metada en el guard de user-roles
+
+import {
+  BadRequestException,
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+  Injectable,
+} from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
+import { Observable } from 'rxjs';
+import { META_ROLES } from 'src/auth/decorators/roleprotected.decorator';
+import { User } from 'src/auth/entities/user.entity';
+
+@Injectable()
+export class UserRolesGuard implements CanActivate {
+  constructor(
+    // ME ayuda a aver iformacion de los decoradores y metadada
+    private readonly reflector: Reflector,
+  ) {}
+
+  canActivate(
+    context: ExecutionContext,
+  ): boolean | Promise<boolean> | Observable<boolean> {
+    //console.log('UserRoleGuard')
+
+    // Obtenemos el arreglo de roles del metadata
+    const validRoles: string[] = this.reflector.get(
+      META_ROLES,
+      context.getHandler(),
+    );
+
+    // Si  no hay metadata de arreglos, se retorna true  
+    if(!validRoles) return true;
+    if(validRoles.length === 0) return true;
+
+    // Obtenemos el usuario
+    const req = context.switchToHttp().getRequest();
+    const user = req.user as User;
+
+    // Validamos si el usuario no exista
+    if (!user) throw new BadRequestException('User not found');
+
+    // asi obtenemos el rol del usuario
+    console.log({ userRoles: user.roles });
+
+    //console.log(validRoles)
+
+    // Recorremos el arreglo de usuario
+    for (const role of user.roles) {
+      // Si al menos hay un role dentro del arreglo retornamos true
+      if (validRoles.includes(role)) {
+        return true;
+      }
+    }
+
+    // Si no esta en el arreglo retornamos la exception, informando 
+    // los tipos de usuarios que debe tener
+    throw new ForbiddenException(
+      `User ${user.fullName} need a valid role: [${validRoles}]`
+    )
+
+    //return true;
+  }
+}
+
+
+- Creamos una interface que tenga un enum con los tipos de roles
+
+export enum ValidRoles {
+  admin = 'admin',
+  superUser = 'super-user',
+  user = 'user',
+}
+
+
+- Creamos el archivo de barril para exportar las interfaces
+
+index.ts
+
+export { JwtPayload } from './jwt-payload.interface';
+export { ValidRoles } from "./valid-roles";
+
+
+
+- Agregamos el tipo al decorador de role protected
+
+import { SetMetadata } from '@nestjs/common';
+import { ValidRoles } from '../interfaces';
+
+export const META_ROLES = 'roles';
+
+
+export const Roleprotected = (...args: ValidRoles[]) => {
+
+return SetMetadata(META_ROLES, args);
+
+};
+
+
+- Agregamos el decorador en la ruta 
+
+
+  @Get('private2')
+  //@SetMetadata('roles', ['admin','super-user','']) // En esta metada tenemos un arreglo de roles
+  @Roleprotected(ValidRoles.superUser, ValidRoles.admin)
+  @UseGuards(AuthGuard(), UserRolesGuard)
+  privateRoute2(
+    
+    @GetUser() user: User
+  ){
+
+    return {
+      ok: true,
+      user
+    }
+
+  }
+
+** Composicion de decoradores
+
+https://docs.nestjs.com/custom-decorators#decorator-composition
+
+- Creamosun decorador de acuerdo a la documentacion =>auth.decorator.ts
+
+Es un decorador que va a tener por dentro otros decoradores
+
+- Copiamos el codigo de la documentacion
+
+import { applyDecorators } from '@nestjs/common';
+
+export function Auth(...roles: Role[]) {
+  return applyDecorators(
+    SetMetadata('roles', roles),
+    UseGuards(AuthGuard, RolesGuard),
+    ApiBearerAuth(),
+    ApiUnauthorizedResponse({ description: 'Unauthorized' }),
+  );
+}
+
+
+- Modificamos la funcion 
+import { UseGuards, applyDecorators } from '@nestjs/common';
+import { ValidRoles } from '../interfaces';
+import { Roleprotected } from './roleprotected.decorator';
+import { AuthGuard } from '@nestjs/passport';
+import { UserRolesGuard } from '../guards/user-roles/user-roles.guard';
+
+export function Auth(...roles: ValidRoles[]) {
+  return applyDecorators(
+    Roleprotected(...roles),
+    UseGuards(AuthGuard(), UserRolesGuard),
+
+  );
+}
+
+- Exportamos el decorador en el archivo de barril
+
+export { Auth } from "./auth.decorator";
+export { Roleprotected } from "./roleprotected.decorator";
+
+export { GetUser } from "./get-user.decorator";
+export { RawHeaders } from "./raw-headers.decorator";
+
+
+- Agregamos  el decoador en la ruta
+
+  @Get('private3')
+  //@SetMetadata('roles', ['admin','super-user','']) // En esta metada tenemos un arreglo de roles
+  //@Roleprotected(ValidRoles.superUser, ValidRoles.admin)
+  //@UseGuards(AuthGuard(), UserRolesGuard)
+  @Auth()
+  privateRoute3(
+    
+    @GetUser() user: User
+  ){
+
+    return {
+      ok: true,
+      user
+    }
+
+  }
+
+}
+
+
+** 
  
+
+
 
 
 
