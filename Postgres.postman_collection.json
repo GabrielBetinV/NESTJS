@@ -1,0 +1,150 @@
+{
+	"info": {
+		"_postman_id": "c09ecc58-7ddc-4788-9cbd-dc838142e815",
+		"name": "Postgres",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Get",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:3000/api/products/",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"api",
+						"products",
+						""
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "POST",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"title\":\"Stefy's shirtaaaass2a\",\r\n    \"sizes\":[\"SM\", \"M\", \"L\"],\r\n    \"gender\":\"men\",\r\n    \"slug\": \"Hola Mundosaas\",\r\n    \"tags\": [\"shirts\",\"carts\"],\r\n    \"images\": [\r\n        \"http://image1.jpg\",\r\n        \"http://image1.jpg\"] \r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:3000/api/products",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"api",
+						"products"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "http://localhost:3000/api/products/",
+			"request": {
+				"method": "PATCH",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"price\": 100.99,    \r\n    \"images\": [\r\n        \"http://image1.jpg\",\r\n        \"http://image1.jpg\"] \r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:3000/api/products/daf2da5e-dec3-4d0b-8658-4ebaa3bbed57",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"api",
+						"products",
+						"daf2da5e-dec3-4d0b-8658-4ebaa3bbed57"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "http://localhost:3000/api/products/9bffd01a-bdab-4abc-9f60-a5cd5ff9269c",
+			"request": {
+				"method": "PATCH",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \r\n    \"price\": 1000.12\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:3000/api/products/9bffd01a-bdab-4abc-9f60-a5cd5ff9269c",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"api",
+						"products",
+						"9bffd01a-bdab-4abc-9f60-a5cd5ff9269c"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "http://localhost:3000/api/files/product",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "file",
+							"type": "file",
+							"src": "/C:/Users/gabri/Desktop/Plantilla-Nomina.docx"
+						}
+					]
+				},
+				"url": {
+					"raw": "http://localhost:3000/api/files/product",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3000",
+					"path": [
+						"api",
+						"files",
+						"product"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

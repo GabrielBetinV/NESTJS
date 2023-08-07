@@ -1,0 +1,526 @@
+** Documentacion con Postman
+
+- En los  3 puntos se pueden exportar un archivo json de los end point realizados
+
+- Este archivo se puede importar en postman y desde postman se podra publicar
+
+** Nestjs swagger - Open Api
+
+https://docs.nestjs.com/openapi/introduction
+
+
+- Instalar swagger
+
+yarn add @nestjs/swagger
+
+
+- Agregar la configuracion de en Main
+
+
+ const config = new DocumentBuilder()
+    .setTitle('Cats example')
+    .setDescription('The cats API description')
+    .setVersion('1.0')
+    .addTag('cats')
+    .build();
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api', app, document);
+
+
+- Modificamos la configuracion
+
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from './app.module';
+import { Logger, ValidationPipe } from '@nestjs/common';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+  const logger = new Logger('Bootstrap');
+
+  app.setGlobalPrefix('api');
+
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    }),
+  );
+
+  const config = new DocumentBuilder()
+    .setTitle('Teslo RESTFul API')
+    .setDescription('Teslo shop endpoints')
+    .setVersion('1.0')
+    .build();
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api', app, document);
+
+  await app.listen(process.env.PORT);
+  logger.log(`App running on port ${process.env.PORT}`);
+}
+bootstrap();
+
+
+
+- Con esta rutaya podriamos  ver la documentacion creada
+
+http://localhost:3000/api
+
+Pero falta mas informacion
+
+
+** Tags, ApiProperty  y  ApiResponse
+
+- Tags, para agrupar los endpoint por controlador (produtos, usuarios etc)
+
+- Agregamos el @ApiTags('Products') en el controlador de productos para que lo separa en la documentacion
+
+
+import { Controller, Get, Post, Body, Patch, Param, Delete, ParseUUIDPipe, Query } from '@nestjs/common';
+import { ProductsService } from './products.service';
+import { CreateProductDto } from './dto/create-product.dto';
+import { UpdateProductDto } from './dto/update-product.dto';
+import { PaginationDto } from 'src/common/dtos/pagination.dto';
+import { Auth, GetUser } from 'src/auth/decorators';
+import { ValidRoles } from 'src/auth/interfaces';
+import { User } from 'src/auth/entities/user.entity';
+import { ApiTags } from '@nestjs/swagger';
+
+@ApiTags('Products')
+@Controller('products')
+export class ProductsController {
+  constructor(private readonly productsService: ProductsService) {}
+
+  @Post()
+  @Auth(ValidRoles.admin)
+  create(@Body() createProductDto: CreateProductDto,
+  @GetUser() user: User) {
+    return this.productsService.create(createProductDto, user);
+  }
+
+  @Get()
+  @Auth()
+  findAll(@Query() paginationDto: PaginationDto) {
+    return this.productsService.findAll(paginationDto);
+  }
+
+  @Get(':term')
+  @Auth()
+  findOne(@Param('term') term: string) {
+    return this.productsService.findOnePlain(term);
+  }
+
+  @Patch(':id')
+  @Auth(ValidRoles.admin)
+  update(@Param('id', ParseUUIDPipe) id: string, @Body() updateProductDto: UpdateProductDto,@GetUser() user: User
+  ) {
+    return this.productsService.update(id, updateProductDto, user);
+  }
+
+  @Delete(':id')
+  @Auth(ValidRoles.admin)
+  remove(@Param('id', ParseUUIDPipe) id: string) {
+    return this.productsService.remove(id);
+  }
+}
+
+
+- Agregamos el tags en cada uno de los contralodres y observaremos que la documentacion
+ya se encontrara separada.
+
+
+PODRIAMOS  INDICAR EL REQ Y RES
+
+- Indicar las respuesta que va a tener, por ejemplo en el post de productos
+
+  @Post()
+  @Auth(ValidRoles.admin)
+  @ApiResponse({status:201, description: 'Product was created'})
+  @ApiResponse({status:400, description: 'Bad request'})
+  @ApiResponse({status:403, description: 'Forbidden. Token related.'})
+  create(@Body() createProductDto: CreateProductDto,
+  @GetUser() user: User) {
+    return this.productsService.create(createProductDto, user);
+  }
+
+- Podemos agregar @ApiProperty() para que e muestren las propiedades en la documentacion.
+
+import {
+  BeforeInsert,
+  BeforeUpdate,
+  Column,
+  Entity,
+  ManyToOne,
+  OneToMany,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
+import { ProductImage } from './product-image.entity';
+import { User } from 'src/auth/entities/user.entity';
+import { ApiProperty } from '@nestjs/swagger';
+
+@Entity({name: 'products'})
+export class Product {
+
+  @ApiProperty()
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @ApiProperty()
+  @Column('text', {
+    unique: true,
+  })
+  title: string;
+
+  @ApiProperty()
+  @Column('float', {
+    default: 0,
+  })
+  price: number;
+
+  @ApiProperty()
+  @Column({
+    type: 'text',
+    nullable: true,
+  })
+  description: string;
+
+  @ApiProperty()
+  @Column('text', {
+    unique: true,
+  })
+  slug: string;
+
+  @ApiProperty()
+  @Column('int', {
+    default: 0,
+  })
+  stock: number;
+
+  @ApiProperty()
+  @Column('text', {
+    array: true,
+  })
+  sizes: string[];
+
+  @ApiProperty()
+  @Column('text')
+  gender: string;
+
+  @ApiProperty()
+  @Column('text', {
+    array: true,
+    default: []
+  })
+  tags: string[];
+
+  @ApiProperty()
+  @OneToMany(
+      () => ProductImage,
+      (productImage) => productImage.product,
+      {cascade: true, eager: true}
+  )
+  images?: ProductImage[];
+
+
+  @ManyToOne(
+    () => User,
+    (user) => user.product,
+    {eager: true}
+  )
+  user: User;
+
+
+
+  @BeforeInsert()
+  checkSlugInsert() {
+    // Validamos si viene el campó slug para autocompletarlo
+    if (!this.slug) {
+      this.slug = this.title;
+    }
+
+    this.slug = this.slug
+      .toLocaleLowerCase()
+      .replaceAll(' ', '_')
+      .replaceAll("'", '');
+  }
+
+  @BeforeUpdate()
+  checkSlugUpdate() {
+    this.slug = this.slug
+      .toLocaleLowerCase()
+      .replaceAll(' ', '_')
+      .replaceAll("'", '');
+  }
+}
+
+
+- Para que las propiedades se muestren, le agregamos el type en el decorador de laq respuesta 201
+
+  @Post()
+  @Auth(ValidRoles.admin)
+  @ApiResponse({status:201, description: 'Product was created', type: Product})
+  @ApiResponse({status:400, description: 'Bad request'})
+  @ApiResponse({status:403, description: 'Forbidden. Token related.'})
+  create(@Body() createProductDto: CreateProductDto,
+  @GetUser() user: User) {
+    return this.productsService.create(createProductDto, user);
+  }
+
+En este punto podriamos observar una ejemplo de la respuesta en la documentacion
+
+
+** Expandir el   ApiProperty
+
+
+Agregar propiedades a los tags para que se vea en la documentacion
+
+import {
+  BeforeInsert,
+  BeforeUpdate,
+  Column,
+  Entity,
+  ManyToOne,
+  OneToMany,
+  PrimaryGeneratedColumn,
+} from 'typeorm';
+import { ProductImage } from './product-image.entity';
+import { User } from 'src/auth/entities/user.entity';
+import { ApiProperty } from '@nestjs/swagger';
+
+@Entity({name: 'products'})
+export class Product {
+
+  @ApiProperty({
+    example: '0f8fc0a2-70ed-4789-a94e-eb879cac9b1e',
+    description: 'Product ID',
+    uniqueItems: true
+  })
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @ApiProperty({
+    example: 'T-Shirt Teslo',
+    description: 'Product Title',
+    uniqueItems: true
+  })
+  @Column('text', {
+    unique: true,
+  })
+  title: string;
+
+  @ApiProperty({
+    example: 0,
+    description: 'Product Price'
+  })
+  @Column('float', {
+    default: 0,
+  })
+  price: number;
+
+  @ApiProperty({
+    example: 'lorem ssdsdaj ujasauunasd  unasdasd',
+    description: 'Product Description',
+    default: null
+  })
+  @Column({
+    type: 'text',
+    nullable: true,
+  })
+  description: string;
+
+  @ApiProperty({
+    example: 'T_Shirt_Teslo',
+    description: 'Product SLUG -for SEO',
+    uniqueItems: true
+  })
+  @Column('text', {
+    unique: true,
+  })
+  slug: string;
+
+  @ApiProperty({
+    example: 10,
+    description: 'Product Stock',
+    default: 0
+  })
+  @Column('int', {
+    default: 0,
+  })
+  stock: number;
+
+  @ApiProperty({
+    example: ['M','XL', 'XXL'],
+    description: 'Product Sizes'
+  })
+  @Column('text', {
+    array: true,
+  })
+  sizes: string[];
+
+  @ApiProperty({
+    example: 'women',
+    description: 'Product Gender'
+  })
+  @Column('text')
+  gender: string;
+
+  @ApiProperty()
+  @Column('text', {
+    array: true,
+    default: []
+  })
+  tags: string[];
+
+  @ApiProperty()
+  @OneToMany(
+      () => ProductImage,
+      (productImage) => productImage.product,
+      {cascade: true, eager: true}
+  )
+  images?: ProductImage[];
+
+
+  @ManyToOne(
+    () => User,
+    (user) => user.product,
+    {eager: true}
+  )
+  user: User;
+
+
+
+  @BeforeInsert()
+  checkSlugInsert() {
+    // Validamos si viene el campó slug para autocompletarlo
+    if (!this.slug) {
+      this.slug = this.title;
+    }
+
+    this.slug = this.slug
+      .toLocaleLowerCase()
+      .replaceAll(' ', '_')
+      .replaceAll("'", '');
+  }
+
+  @BeforeUpdate()
+  checkSlugUpdate() {
+    this.slug = this.slug
+      .toLocaleLowerCase()
+      .replaceAll(' ', '_')
+      .replaceAll("'", '');
+  }
+}
+
+
+
+** Documentar DTO
+
+- Agregamos ApiProperty al pagination DTO
+
+import { ApiProperty } from "@nestjs/swagger";
+import { Type } from "class-transformer";
+import { IsOptional, IsPositive, Min } from "class-validator";
+
+export class PaginationDto {
+
+    @ApiProperty({
+        default: 10,
+        description: 'How many rows do you need'
+    })
+    @IsOptional()
+    @IsPositive()
+    @Type( () => Number)
+    limit?: number;
+
+
+    @ApiProperty({
+        default: 0,
+        description: 'How many rows do you want to skip'
+    })
+    @IsOptional()  
+    @Min(0)
+    @Type( () => Number)
+    offset?: number;
+
+
+}
+
+- Podemos agregar el dto del producto
+
+import { ApiProperty } from '@nestjs/swagger';
+import { IsArray, IsIn, IsInt, IsNumber, IsOptional, 
+    IsPositive, IsString, MinLength 
+} from 'class-validator';
+
+
+export class CreateProductDto {
+
+
+    
+    @ApiProperty({
+        description: 'product title (unique)',
+        nullable: false,
+        minLength: 1
+    })
+    @IsString()
+    @MinLength(1)
+    title: string;
+
+    @ApiProperty()
+    @IsNumber()
+    @IsPositive()
+    @IsOptional()
+    price?: number;
+
+    @ApiProperty()
+    @IsString()
+    @IsOptional()
+    description?: string;
+
+    @ApiProperty()
+    @IsString()
+    @IsOptional()
+    slug?: string;
+
+    @ApiProperty()
+    @IsInt()
+    @IsPositive()
+    @IsOptional()
+    stock?: number; 
+
+    // Indicamos que es un arreglo de string
+    @ApiProperty()
+    @IsString({ each: true })
+    @IsArray()
+    sizes: string[]
+
+    // Que este dentro de estos valores configurados
+    @ApiProperty()
+    @IsIn(['men','women','kid','unisex'])
+    gender: string;
+
+    @ApiProperty()
+    @IsString({ each: true })
+    @IsArray()
+    @IsOptional()
+    tags: string[];
+
+    @ApiProperty()
+    @IsString({ each: true })
+    @IsArray()
+    @IsOptional()
+    images?: string[];
+
+
+
+}
+
+
+- Para agregar al update dto, debemos cambiar la importacion del PartialType
+para que tambien tome la documentacion
+
+//import { PartialType } from '@nestjs/mapped-types';
+import { PartialType } from '@nestjs/swagger';
+import { CreateProductDto } from './create-product.dto';
+
+export class UpdateProductDto extends PartialType(CreateProductDto) {}
