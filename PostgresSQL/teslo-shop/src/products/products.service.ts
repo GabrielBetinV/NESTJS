@@ -14,6 +14,7 @@ import { PaginationDto } from 'src/common/dtos/pagination.dto';
 import { validate as isUUID } from 'uuid';
 import { ProductImage, Product } from './entities';
 import { Delete, Query } from '@nestjs/common';
+import { User } from 'src/auth/entities/user.entity';
 
 @Injectable()
 export class ProductsService {
@@ -34,7 +35,7 @@ export class ProductsService {
     private readonly dataSource: DataSource,
   ) {}
 
-  async create(createProductDto: CreateProductDto) {
+  async create(createProductDto: CreateProductDto, user: User) {
     try {
       // // Validamos si viene el campó slug para autocompletarlo
       // if(!createProductDto.slug){
@@ -58,6 +59,7 @@ export class ProductsService {
       /// De esta manera se guardan los dos repository
       const product = this.productRepository.create({
         ...producDetails,
+        user,
         images: images.map((image) =>
           this.productImageRepository.create({ url: image }),
         ),
@@ -139,7 +141,7 @@ export class ProductsService {
     };
   }
 
-  async update(id: string, updateProductDto: UpdateProductDto) {
+  async update(id: string, updateProductDto: UpdateProductDto, user:User) {
     // Estraer los datos del objeto sin las imagenes, el rest (Que es la data que va a actualizar)
     const { images, ...toUpdate } = updateProductDto;
 
@@ -186,6 +188,7 @@ export class ProductsService {
       }
 
       //  Guardar el producto, pero aun no se ha echo commits
+      product.user = user;
       await queryRunner.manager.save(product);
 
       // Si encuentra el producto lo actualiza
