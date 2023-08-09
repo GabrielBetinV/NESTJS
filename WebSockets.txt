@@ -1,0 +1,107 @@
+**   websockets gateways
+
+Un WebSocket es un protocolo de comunicación bidireccional y
+ en tiempo real que se establece entre un cliente (como un navegador web) y un servidor.
+
+
+https://docs.nestjs.com/websockets/gateways
+
+
+- Generar un nuevo gateways
+
+Se puede crear muchos gateways dentro de una aplicacion
+
+nest g res messagesWs --no-spec
+
+- Realizar las siguientes actualizaciones
+
+yarn add --save @nestjs/websockets @nestjs/platform-socket.io
+
+yarn add @nestjs/websockets
+
+yarn add @nestjs/platform-socket.io
+
+
+- Habilitar el cors 
+
+import { WebSocketGateway } from '@nestjs/websockets';
+import { MessagesWsService } from './messages-ws.service';
+
+@WebSocketGateway({cors:true})
+export class MessagesWsGateway {
+  constructor(private readonly messagesWsService: MessagesWsService) {}
+}
+
+
+Probar esta ruta en postman o  insomnia para validar
+todo lo qye podemos utilizar
+
+http://localhost:3000/socket.io/socket.io.js
+
+
+Est es la url es la que debe en entregarse al cliente
+
+**  Server - Escuchar conexiones y desconexiones
+
+El namespace, es como una sala de chats
+
+Se  puede indicar en el gateway
+
+import { WebSocketGateway } from '@nestjs/websockets';
+import { MessagesWsService } from './messages-ws.service';
+
+@WebSocketGateway({cors:true, namespace: '/'})
+export class MessagesWsGateway {
+  constructor(private readonly messagesWsService: MessagesWsService) {}
+}
+
+En el namespace tambien se puede obtener el id del cliente
+
+- Conexion y desconexion del cliente
+
+La clase gateway debera implementar estas ionterfaces
+
+import { OnGatewayConnection, OnGatewayDisconnect, WebSocketGateway } from '@nestjs/websockets';
+import { MessagesWsService } from './messages-ws.service';
+
+@WebSocketGateway({cors:true, namespace: '/'})
+export class MessagesWsGateway  implements OnGatewayConnection, OnGatewayDisconnect{
+  constructor(private readonly messagesWsService: MessagesWsService) {}
+
+  
+  handleConnection(client: any, ...args: any[]) {
+    throw new Error('Method not implemented.');
+  }
+  handleDisconnect(client: any) {
+    throw new Error('Method not implemented.');
+  }
+}
+
+- Instalamos Socket.io
+
+yarn add socket.io 
+
+- Imprimir en consola la conexion y desconexion del cliente
+
+import { OnGatewayConnection, OnGatewayDisconnect, WebSocketGateway } from '@nestjs/websockets';
+import { MessagesWsService } from './messages-ws.service';
+import { Socket } from 'socket.io';
+
+@WebSocketGateway({cors:true, namespace: '/'})
+export class MessagesWsGateway  implements OnGatewayConnection, OnGatewayDisconnect{
+  constructor(private readonly messagesWsService: MessagesWsService) {}
+
+
+  handleConnection(client: Socket, ...args: any[]) {
+   console.log('Cliente Conectado: ', client.id)
+  }
+  handleDisconnect(client: Socket) {
+    console.log('Cliente Desconectado: ', client.id)
+  }
+}
+
+
+**  Cliente - Vite Vanilla TypeScript
+
+Crearemos una aplicacion para consumir
+
