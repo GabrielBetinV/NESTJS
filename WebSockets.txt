@@ -105,3 +105,442 @@ export class MessagesWsGateway  implements OnGatewayConnection, OnGatewayDisconn
 
 Crearemos una aplicacion para consumir
 
+- yarn create vite
+
+- Nombre ws-cliente
+
+- Seleccionamos vanilla y typescript
+
+- levantar la aplicacion
+
+yarn, para instalar el node module
+
+yarn dev
+
+- Modificamos el main
+
+import "./style.css";
+import typescriptLogo from "./typescript.svg";
+import viteLogo from "/vite.svg";
+import { setupCounter } from "./counter.ts";
+
+document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
+   <div>
+   
+    <h1>WebSocket - Cliente</h1>
+
+    <span>offline</span>
+   
+
+   </div>
+ `;
+
+// document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
+//   <div>
+//     <a href="https://vitejs.dev" target="_blank">
+//       <img src="${viteLogo}" class="logo" alt="Vite logo" />
+//     </a>
+//     <a href="https://www.typescriptlang.org/" target="_blank">
+//       <img src="${typescriptLogo}" class="logo vanilla" alt="TypeScript logo" />
+//     </a>
+//     <h1>Vite + TypeScript</h1>
+//     <div class="card">
+//       <button id="counter" type="button"></button>
+//     </div>
+//     <p class="read-the-docs">
+//       Click on the Vite and TypeScript logos to learn more
+//     </p>
+//   </div>
+// `
+
+//setupCounter(document.querySelector<HTMLButtonElement>("#counter")!);
+
+
+- Instalar el paquete
+
+yarn add socket.io-client
+
+tener en cuenta que la version del socket.io del fronted y el Backend sean la misma
+
+- Crear un archivo que sera el socket => socket-client.ts
+
+
+import { Manager } from "socket.io-client";
+
+export const connectToServer = () => {
+
+   const manager = new Manager('http://localhost:3000/socket.io/socket.io.js'); //
+
+   const socket =  manager.socket('/');
+    
+}
+
+
+
+- LLamar a la funcion en el main
+
+import "./style.css";
+import typescriptLogo from "./typescript.svg";
+import viteLogo from "/vite.svg";
+import { setupCounter } from "./counter.ts";
+import { connectToServer } from "./socket-client.ts";
+
+document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
+   <div>
+   
+    <h1>WebSocket - Cliente</h1>
+
+    <span>offline</span>
+   
+
+   </div>
+ `;
+
+ // Llamamos la conexion
+ connectToServer();
+
+
+Refrescar el navegador donde esta la aplicacion y veremos que en el Backend 
+se mostrara el cliente conectado y desconectado
+
+Esto se muestra por la funcion que tenemos en el Backend que imprime la conexion y desconexion del cliente
+
+
+- Podriamos imprimir en consola para ver la informacion del socket
+
+import { Manager } from "socket.io-client";
+
+export const connectToServer = () => {
+
+   const manager = new Manager('http://localhost:3000/socket.io/socket.io.js'); //
+
+   const socket =  manager.socket('/');
+
+    console.log({socket})
+
+}
+
+
+** Server - Mantener identificados los clientes
+
+
+- Creamos unas funciones en el servicio del Gatewey del Backend,  para conectar y desconectar al cliente
+
+
+import { Injectable } from '@nestjs/common';
+import { Socket } from 'socket.io';
+
+
+// Interface que tendra un arreglo con los id de los usuarios
+interface ConnectedClients {
+    [id: string] : Socket
+}
+
+@Injectable()
+export class MessagesWsService {
+
+      private connectedClients: ConnectedClients = {}   
+
+      registerClient(client: Socket){
+        this.connectedClients[client.id] = client;
+      }
+
+
+      removeClient(clientId: string){
+
+        delete this.connectedClients[clientId];
+
+      }
+
+}
+
+
+- Llamamos las funciones creadas desde el gateway
+
+import { OnGatewayConnection, OnGatewayDisconnect, WebSocketGateway } from '@nestjs/websockets';
+import { MessagesWsService } from './messages-ws.service';
+import { Socket } from 'socket.io';
+
+@WebSocketGateway({cors:true, namespace: '/'})
+export class MessagesWsGateway  implements OnGatewayConnection, OnGatewayDisconnect{
+  constructor(private readonly messagesWsService: MessagesWsService) {}
+
+
+  handleConnection(client: Socket, ...args: any[]) {
+   //console.log('Cliente Conectado: ', client.id)
+    
+    this.messagesWsService.registerClient(client);
+
+    
+ 
+  }
+  handleDisconnect(client: Socket) {
+    //console.log('Cliente Desconectado: ', client.id)
+
+    this.messagesWsService.removeClient(client.id);
+  }
+}
+
+
+- Creamos otra funcion en el servicio para contar los clientes conectados
+
+
+
+      getConnectedClients(): number {
+
+        return Object.keys(this.connectedClients).length;
+
+      }
+
+
+- Consoleamos la nueva funcion en el gateway
+
+import { OnGatewayConnection, OnGatewayDisconnect, WebSocketGateway } from '@nestjs/websockets';
+import { MessagesWsService } from './messages-ws.service';
+import { Socket } from 'socket.io';
+
+@WebSocketGateway({cors:true, namespace: '/'})
+export class MessagesWsGateway  implements OnGatewayConnection, OnGatewayDisconnect{
+  constructor(private readonly messagesWsService: MessagesWsService) {}
+
+
+  handleConnection(client: Socket, ...args: any[]) {
+   //console.log('Cliente Conectado: ', client.id)
+    
+    this.messagesWsService.registerClient(client);
+
+    console.log({conectados: this.messagesWsService.getConnectedClients()});
+
+ 
+  }
+  handleDisconnect(client: Socket) {
+    //console.log('Cliente Desconectado: ', client.id)
+
+    this.messagesWsService.removeClient(client.id);
+  }
+}
+
+
+
+
+** Cliente, Detectar conexion y desconexion
+
+- Crear esta funcion para escuchar constantemete si el cliente esta conectado o no
+
+
+const addListeners = ( socket: Socket) => {
+
+    const serverStatusLabel = document.querySelector('#server-status')!;
+
+     // Escuchar el estado de la coneccion
+     socket.on('connect',  () => {
+        console.log('connected');
+
+     })  
+     
+       
+       socket.on('disconnect',  () => {
+        console.log('disconnected');
+
+     })  
+  
+}
+
+- Llamamos la funcion en el connectToServer
+
+export const connectToServer = () => {
+
+   const manager = new Manager('http://localhost:3000/socket.io/socket.io.js'); //
+
+   const socket =  manager.socket('/');
+
+    console.log({socket})
+
+    addListeners(socket);
+
+}
+
+Ahora si nos conectamos, bajamos el servidor y se consolea que esta desconectado
+
+Cuando se vuyelve a levantar,  en un intervalo de tiempo se consolea coneactado
+
+
+- Modificamos el span para ver el mensaje en el navegador
+
+
+import { Manager,Socket } from "socket.io-client";
+
+export const connectToServer = () => {
+
+   const manager = new Manager('http://localhost:3000/socket.io/socket.io.js'); //
+
+   const socket =  manager.socket('/');
+
+    console.log({socket})
+
+    addListeners(socket);
+
+}
+
+const addListeners = ( socket: Socket) => {
+
+    const serverStatusLabel = document.querySelector('#server-status')!;
+
+     // Escuchar el estado de la coneccion
+     socket.on('connect',  () => {
+        //console.log('connected');
+        serverStatusLabel.innerHTML = 'Connected';
+     })  
+     
+       
+       socket.on('disconnect',  () => {
+        //console.log('disconnected');
+        serverStatusLabel.innerHTML = 'Disconnected';
+     })  
+  
+}
+
+
+** Cliente - Clientes Conectados
+
+- Utilizamos el decorador  de WebSocketServer
+
+
+  // Decorador que tiene toda la informacion del cliente
+  @WebSocketServer() wss: Server;
+
+- Cambiamos la funcion que obtiene los clientes conectados en el servuicio del gateway
+
+  // Enviar los id de los clientes
+  getConnectedClients(): string[] {
+    return Object.keys(this.connectedClients);
+  }
+
+- >Emitimos el arreglo de id cada vez que se conectan
+
+
+  handleConnection(client: Socket, ...args: any[]) {
+   //console.log('Cliente Conectado: ', client.id)
+    
+    this.messagesWsService.registerClient(client);
+
+    console.log({conectados: this.messagesWsService.getConnectedClients()});
+
+
+    // mandar un mensaje a todas las personas que estan conectadas
+    this.wss.emit('clients-updated', this.messagesWsService.getConnectedClients());
+    
+ 
+  }
+
+- En el cliente debemos recibir el evento clients-updated
+
+En la funcion addlisteners, agregamos un socket.on para escuhar el evento e imprimir el arreglo en consola
+
+
+
+const addListeners = ( socket: Socket) => {
+
+    //clients-ul
+
+    const serverStatusLabel = document.querySelector('#server-status')!;
+
+     // Escuchar el estado de la coneccion
+     socket.on('connect',  () => {
+        //console.log('connected');
+        serverStatusLabel.innerHTML = 'Connected';
+     })  
+     
+       
+       socket.on('disconnect',  () => {
+        //console.log('disconnected');
+        serverStatusLabel.innerHTML = 'Disconnected';
+     }) 
+     
+     
+     socket.on('clients-updated',  (clients: string[]) => {
+       console.log({clients});
+        
+     }) 
+  
+}
+
+
+-  Como ya tenemos el arreglo de cliente, podemos entonces iterar sobre el arreglo y pitar la lista
+
+
+ socket.on('clients-updated',  (clients: string[]) => {
+       //console.log({clients});
+        
+        let clientsHtml = '';
+
+        clients.forEach( clientId => {
+            clientsHtml += `
+
+                <li>${clientId}</li>
+
+            `});
+            clientsUL.innerHTML = clientsHtml;
+
+     }) 
+  
+
+import { Manager,Socket } from "socket.io-client";
+
+export const connectToServer = () => {
+
+   const manager = new Manager('http://localhost:3000/socket.io/socket.io.js'); //
+
+   const socket =  manager.socket('/');
+
+    console.log({socket})
+
+    addListeners(socket);
+
+}
+
+const addListeners = ( socket: Socket) => {
+
+    //clients-ul
+
+    const serverStatusLabel = document.querySelector('#server-status')!;
+
+    const clientsUL = document.querySelector('#clients-ul')!;
+
+     // Escuchar el estado de la coneccion
+     socket.on('connect',  () => {
+        //console.log('connected');
+        serverStatusLabel.innerHTML = 'Connected';
+     })  
+     
+       
+       socket.on('disconnect',  () => {
+        //console.log('disconnected');
+        serverStatusLabel.innerHTML = 'Disconnected';
+     }) 
+     
+     
+     socket.on('clients-updated',  (clients: string[]) => {
+       //console.log({clients});
+        
+        let clientsHtml = '';
+
+        clients.forEach( clientId => {
+            clientsHtml += `
+
+                <li>${clientId}</li>
+
+            `});
+            clientsUL.innerHTML = clientsHtml;
+
+     }) 
+  
+}
+
+** Emitir Cliente - Escuchar Servidor
+
+
+
+
+
+
