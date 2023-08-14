@@ -539,6 +539,639 @@ const addListeners = ( socket: Socket) => {
 
 ** Emitir Cliente - Escuchar Servidor
 
+El cliente va a emitir un evento cuando escribe en la caja de texto
+
+- Crear un formulario con un input en el front
+
+import "./style.css";
+import typescriptLogo from "./typescript.svg";
+import viteLogo from "/vite.svg";
+import { setupCounter } from "./counter.ts";
+import { connectToServer } from "./socket-client.ts";
+
+document.querySelector<HTMLDivElement>("#app")!.innerHTML = `
+   <div>
+   
+    <h1>WebSocket - Cliente</h1>
+
+    <span id="server-status">offline</span>
+
+    <ul id="clients-ul">
+
+    </ul>
+
+    <form id="message-form">
+      <input placeholder="message" id="message-input" />
+    </form> 
+
+   </div>
+ `;
+
+// Llamamos la conexion
+connectToServer();
+
+- Obtenemos el formulario y el input en el socket client, para la fuyncion addListeners
+
+ const messageForm = document.querySelector<HTMLFormElement>('#message-form')!;
+    const messageInput = document.querySelector<HTMLInputElement>('#message-input')!;
+
+
+- Creamos una funcion para emitir lo que el cliente esta enviando
+
+  messageForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+        if(messageInput.value.trim().length <= 0) return;
+
+
+        socket.emit('message-from-cliente', {
+            id: 'YO!!', 
+            message: messageInput.value
+
+        });
+
+        messageInput.value = '';
+        //console.log({id: 'YO!!', message: messageInput.value})
+     })
+
+- Crear un dto en el servidor, para el mensaje
+
+import { IsString, MinLength } from "class-validator";
+
+
+export class NewMessageDto{
+
+    @IsString()
+    @MinLength(1)
+    message: string;
+
+}
+
+- Creamos una funcion que reciba el mensaje en el servidor
+
+ // escuchar un mensaje
+
+    @SubscribeMessage('message-from-cliente')
+    onMessageFromClient(client:Socket, payload:NewMessageDto){
+
+        console.log(client.id, payload)
+    }
+
+
+** Formas de emitir el mensaje desde el servidor
+
+- Agrega estas etiquetas en el main del frontd
+
+  <h3>Messages</h3>
+    <ul id="messages-ul"></ul>
+
+
+
+
+
+- En el servidor,  cuando recibimos el mensaje lo emitimos opara que el cliente
+lo vea, solo ese cliente lo va a ver, si hay otros conectados no lo van a ver
+
+
+
+    @SubscribeMessage('message-from-cliente')
+    onMessageFromClient(client:Socket, payload:NewMessageDto){
+
+        //console.log(client.id, payload)
+    
+      
+        // Mandar el mensaje al cliente
+        client.emit('message-from-server', {
+          fullname: 'Soy yo',
+          message: payload.message || 'no-message!!'
+        });
+    
+      }
+
+
+- En el fronted escuhamos el mensaje
+
+
+
+     socket.on('message-from-server',  (payload: {
+        fullname: string, message: string
+     }) => {
+
+        console.log(payload)
+     
+ 
+      })    
+
+
+
+ - Ahora podriamos emitir el mensaje a todos, menos al cliente que emitio
+
+
+        // Emitir a todos los clientes conectados
+        client.broadcast.emit('message-from-server', {
+          fullname: 'Soy yo',
+          message: payload.message || 'no-message!!'
+        });
+
+- Aca podriamos emitir a todos incluyendo el cliente
+
+  // Emitir a todos incluyendo el que emite
+        this.wss.emit('message-from-server', {
+          fullname: 'Soy yo',
+          message: payload.message || 'no-message!!'
+        });
+
+
+Si se investiga mas, podriamos crear salas para emitir mensajes solo a los de la sala
+
+    client.join('ventas');
+    this.wss.to('ventas').emit('Message');
+
+-  Agregar los mensajes en la vista
+
+
+const messageUL = document.querySelector<HTMLUListElement>("#messages-ul")!;
+
+
+import { Manager, Socket } from "socket.io-client";
+
+export const connectToServer = () => {
+  const manager = new Manager("http://localhost:3000/socket.io/socket.io.js"); //
+
+  const socket = manager.socket("/");
+
+  console.log({ socket });
+
+  addListeners(socket);
+};
+
+const addListeners = (socket: Socket) => {
+  //clients-ul
+
+  const serverStatusLabel = document.querySelector("#server-status")!;
+
+  const clientsUL = document.querySelector("#clients-ul")!;
+
+  const messageForm = document.querySelector<HTMLFormElement>("#message-form")!;
+  const messageInput =
+    document.querySelector<HTMLInputElement>("#message-input")!;
+
+  const messageUL = document.querySelector<HTMLUListElement>("#messages-ul")!;
+
+  // Escuchar el estado de la coneccion
+  socket.on("connect", () => {
+    //console.log('connected');
+    serverStatusLabel.innerHTML = "Connected";
+  });
+
+  socket.on("disconnect", () => {
+    //console.log('disconnected');
+    serverStatusLabel.innerHTML = "Disconnected";
+  });
+
+  socket.on("clients-updated", (clients: string[]) => {
+    //console.log({clients});
+
+    let clientsHtml = "";
+
+    clients.forEach((clientId) => {
+      clientsHtml += `
+
+                <li>${clientId}</li>
+
+            `;
+    });
+    clientsUL.innerHTML = clientsHtml;
+  });
+
+  socket.on(
+    "message-from-server",
+    (payload: { fullname: string; message: string }) => {
+      // console.log(payload)
+
+      const newMessage = `
+       <li>
+           <strong>${payload.fullname}</strong>
+           <span>${payload.message}</span>
+       </li>
+   `;
+      const li = document.createElement("li");
+      li.innerHTML = newMessage;
+      messageUL.append(li);
+    }
+  );
+
+  messageForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (messageInput.value.trim().length <= 0) return;
+
+    socket.emit("message-from-cliente", {
+      id: "YO!!",
+      message: messageInput.value,
+    });
+
+    messageInput.value = "";
+    //console.log({id: 'YO!!', message: messageInput.value})
+  });
+};
+
+
+** Preparar cliente para enviar JWT
+
+- Crear una caja de texto y un boton para enviar el JWT
+
+   <input id="jwt-token" placeholder="Json Web Token" />
+    <button id="btn-connect">Connect</button>
+
+    <br/>
+
+
+-  Obtenemos el valor del input y creamos la funcion para el boton
+
+// Capturamos el input y el boton
+const jwtToken = document.querySelector<HTMLInputElement>('#jwt-token')!;
+const btnConnect = document.querySelector<HTMLButtonElement>('#btn-connect')!;
+
+
+// Obtenemos el evento click del boton 
+btnConnect.addEventListener('click', () => {
+
+  if( jwtToken.value.trim().length <= 0) return alert('Enter a valid JWT');
+
+  connectToServer();
+
+})
+
+- A la funcion connectToServer podemos agregar un parametro de entrada que es el token
+y extraheaders para enviar info al servidor
+
+
+export const connectToServer = (token:string) => {
+  const manager = new Manager("http://localhost:3000/socket.io/socket.io.js", {
+    extraHeaders: {
+      hola: 'mundo',
+      authentication: token
+    }
+  }); //
+
+  const socket = manager.socket("/");
+
+  console.log({ socket });
+
+  addListeners(socket);
+};
+
+
+- Enviamos el token al ejecutar la funcion
+
+// Obtenemos el evento click del boton 
+btnConnect.addEventListener('click', () => {
+
+  if( jwtToken.value.trim().length <= 0) return alert('Enter a valid JWT');
+
+  connectToServer(jwtToken.value.trim());
+
+})
+
+- En eel servidor podriamos imprimir el client dentro de la fiuncion que conecta y
+observaremos la informacion enviada
+
+
+  handleConnection(client: Socket, ...args: any[]) {
+   //console.log('Cliente Conectado: ', client.id)
+    
+
+    console.log(client)
+
+    this.messagesWsService.registerClient(client);
+
+    console.log({conectados: this.messagesWsService.getConnectedClients()});
+
+
+    // mandar un mensaje a todas las personas que estan conectadas
+    this.wss.emit('clients-updated', this.messagesWsService.getConnectedClients());
+
+  
+    
+ 
+  }
+
+- Podriamos almacenar el token en una constante
+
+
+   //console.log('Cliente Conectado: ', client.id)
+    
+   // Obtenemos el token
+    const token = client.handshake.headers.authentication as string;
+    console.log(token)
+
+
+** Validar JWT del Handshake
+
+- Inyectamos el servicio en el gateway
+
+
+  constructor(
+    private readonly messagesWsService: MessagesWsService,
+    private readonly jwtService: JwtService
+    ) {}
+
+
+- Importar el modulo de auth en el de messages
+
+import { Module } from '@nestjs/common';
+import { MessagesWsService } from './messages-ws.service';
+import { MessagesWsGateway } from './messages-ws.gateway';
+import { AuthModule } from 'src/auth/auth.module';
+
+@Module({
+  providers: [MessagesWsGateway, MessagesWsService],
+  imports: [AuthModule]
+})
+export class MessagesWsModule {}
+
+
+- creamos una variable pauload y almacenamos el tocken verificandolo con la
+funcion del servicio
+
+ handleConnection(client: Socket, ...args: any[]) {
+   //console.log('Cliente Conectado: ', client.id)
+    
+   // Obtenemos el token
+    const token = client.handshake.headers.authentication as string;
+    //console.log(token)
+
+    let payload: JwtPayload; 
+    try {
+       payload = this.jwtService.verify(token);
+       console.log(payload);
+
+    } catch (error) {
+      client.disconnect();
+      return;
+    }
+
+    this.messagesWsService.registerClient(client);
+
+    console.log({conectados: this.messagesWsService.getConnectedClients()});
+
+
+    // mandar un mensaje a todas las personas que estan conectadas
+    this.wss.emit('clients-updated', this.messagesWsService.getConnectedClients());
+
+  
+    
+ 
+  }
+
+porbar en insomnia, obtener el web token y probar la conexion en el navegador
+
+
+** Enlazar token con el usuario
+
+- Inyectar el repositorio de usuario en el servicio del messages
+
+  constructor(
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>
+  ){}
+
+-  Agregar un parametro de entrada para recibir el id del usuario
+
+
+  registerClient(client: Socket, userId:string) {
+    this.connectedClients[client.id] = client;
+  }
+
+- Enviar el id dl usuario al invocar la funcion que registra un cliente
+
+this.messagesWsService.registerClient(client, payload.id);
+
+
+- Consultamops el usuario y validamos si existe
+
+  async registerClient(client: Socket, userId:string) {
+
+    // Consultamos el usuaio con el ID
+    const user = await this.userRepository.findOneBy({id: userId});
+
+    // Validar si el usuario existo o esta activo
+    if(!user) throw new Error('User not found');
+    if(!user.isActive) throw new Error('User not active');
+
+    
+    this.connectedClients[client.id] = client;
+  }
+
+- Modificamos la interface  de la conexion para agregar el USER
+
+
+// Interface que tendra un arreglo con los id de los usuarios
+interface ConnectedClients {
+  [id: string]: {
+    Socket: Socket;
+    User: User;
+  };
+}
+
+-  Almacenamos el socekt y el 	usuario en la onterface
+
+
+    this.connectedClients[client.id] = {
+      socket: client,
+      user: user,
+    };
+
+- Modificamos la funcion  handleconnection para colocarla asyncrona  e incluimos
+la invocacion del registre dentro del try
+
+ async handleConnection(client: Socket, ...args: any[]) {
+   //console.log('Cliente Conectado: ', client.id)
+    
+   // Obtenemos el token
+    const token = client.handshake.headers.authentication as string;
+    //console.log(token)
+
+    let payload: JwtPayload; 
+    try {
+       payload = this.jwtService.verify(token);
+       await this.messagesWsService.registerClient(client, payload.id);
+       console.log(payload);
+
+    } catch (error) {
+      client.disconnect();
+      return;
+    }
+
+    
+    console.log({conectados: this.messagesWsService.getConnectedClients()});
+
+
+    // mandar un mensaje a todas las personas que estan conectadas
+    this.wss.emit('clients-updated', this.messagesWsService.getConnectedClients());
+
+  
+    
+ 
+  }
+
+
+- Creamos una funcion en el servicio del messages para obtener el nombre del usuario
+
+  //Funcion para obtener el nombre del usuario
+  getUserFullName(socketId: string){
+    return this.connectedClients[socketId].user.fullName;
+  }
+
+- Al momento de emitir el mensaje del aservidor al ciente, le enviamos
+el nombre dl usuario
+
+   // Emitir a todos incluyendo el que emite
+        this.wss.emit('message-from-server', {
+          fullname: this.messagesWsService.getUserFullName(client.id),
+          message: payload.message || 'no-message!!'
+        });
+
+
+** Desconectar usuarios desconectados
+
+- creamos una funcion que reciba el id y desconecte al usuario
+
+
+  // Funcion para validar la conexion y desconectar al usuario
+
+  private checkUserConnection( user: User ) {
+
+    for (const clientId of Object.keys( this.connectedClients ) ) {
+        
+        const connectedClient = this.connectedClients[clientId];
+
+        if ( connectedClient.user.id === user.id ){
+            connectedClient.socket.disconnect();
+            break;
+        }
+    }
+
+}
+
+- LLamamos la funcion antes de volver a conectar
+
+  async registerClient(client: Socket, userId: string) {
+    // Consultamos el usuaio con el ID
+    const user = await this.userRepository.findOneBy({ id: userId });
+
+    // Validar si el usuario existo o esta activo
+    if (!user) throw new Error('User not found');
+    if (!user.isActive) throw new Error('User not active');
+
+
+
+    this.checkUserConnection(user);
+
+    this.connectedClients[client.id] = {
+      socket: client,
+      user: user,
+    };
+  }
+
+- Para que los listener esten actualizado cambiamos la funcion connectToServer
+para que borre los listeners anteriores
+
+import { Manager, Socket } from "socket.io-client";
+
+let socket: Socket;
+
+export const connectToServer = (token:string) => {
+  const manager = new Manager("http://localhost:3000/socket.io/socket.io.js", {
+    extraHeaders: {
+      hola: 'mundo',
+      authentication: token
+    }
+  }); //
+
+
+  // Borramos los listener anteriores en el caso de que exista
+  socket?.removeAllListeners(); 
+
+  // Creamos el nuevo listener
+  socket = manager.socket("/");
+ 
+
+  console.log({ socket });
+
+  addListeners(socket);
+};
+
+const addListeners = (socket: Socket) => {
+  //clients-ul
+
+  const serverStatusLabel = document.querySelector("#server-status")!;
+
+  const clientsUL = document.querySelector("#clients-ul")!;
+
+  const messageForm = document.querySelector<HTMLFormElement>("#message-form")!;
+  const messageInput =
+  document.querySelector<HTMLInputElement>("#message-input")!;
+
+  const messageUL = document.querySelector<HTMLUListElement>("#messages-ul")!;
+
+  // Escuchar el estado de la coneccion
+  socket.on("connect", () => {
+    //console.log('connected');
+    serverStatusLabel.innerHTML = "Connected";
+  });
+
+  socket.on("disconnect", () => {
+    //console.log('disconnected');
+    serverStatusLabel.innerHTML = "Disconnected";
+  });
+
+  socket.on("clients-updated", (clients: string[]) => {
+    //console.log({clients});
+
+    let clientsHtml = "";
+
+    clients.forEach((clientId) => {
+      clientsHtml += `
+
+                <li>${clientId}</li>
+
+            `;
+    });
+    clientsUL.innerHTML = clientsHtml;
+  });
+
+  socket.on(
+    "message-from-server",
+    (payload: { fullname: string; message: string }) => {
+      // console.log(payload)
+
+      const newMessage = `
+       <li>
+           <strong>${payload.fullname}</strong>
+           <span>${payload.message}</span>
+       </li>
+   `;
+      const li = document.createElement("li");
+      li.innerHTML = newMessage;
+      messageUL.append(li);
+    }
+  );
+
+  messageForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (messageInput.value.trim().length <= 0) return;
+
+    socket.emit("message-from-cliente", {
+      id: "YO!!",
+      message: messageInput.value,
+    });
+
+    messageInput.value = "";
+    //console.log({id: 'YO!!', message: messageInput.value})
+  });
+};
+
+
 
 
 
